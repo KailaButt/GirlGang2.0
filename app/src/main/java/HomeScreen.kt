@@ -21,7 +21,7 @@ enum class Mood(val emoji: String, val label: String) {
 
 private fun tipsFor(mood: Mood?): List<String> {
     return when (mood) {
-        Mood.CALM -> listOf("Keep it light today", "Start with one small task", "Protect your calm")
+        Mood.CALM -> listOf("Keep it light today!", "Start with one small task", "Protect your calm")
         Mood.OKAY -> listOf("Pick something easy first", "Try a 5-minute timer")
         Mood.DISTRACTED -> listOf("Put phone away", "Try 5 minute session", "Remove distractions")
         Mood.STRESSED -> listOf("Breathe slowly", "Break task into tiny steps")
