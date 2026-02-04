@@ -1,4 +1,4 @@
-package com.example.consolicalm.ui.home
+package com.example.consolicalm
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,9 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.consolicalm.ui.theme.ConsoliCalmTheme
 
 enum class Mood(val emoji: String, val label: String) {
     CALM("😌", "Calm"),
@@ -23,34 +21,79 @@ enum class Mood(val emoji: String, val label: String) {
 
 private fun tipsFor(mood: Mood?): List<String> {
     return when (mood) {
-        Mood.CALM -> listOf("Keep it light today.", "Start with one small task.", "Protect your calm with short sessions.")
-        Mood.OKAY -> listOf("Pick something easy first.", "Try a 5-minute timer.", "Do the smallest step.")
-        Mood.DISTRACTED -> listOf("Put your phone face down.", "Try 5 minutes only.", "Remove one distraction.", "Do the easiest part first.")
-        Mood.STRESSED -> listOf("Breathe for 60 seconds.", "Break it into tiny steps.", "You don’t need to finish—just start.")
+        Mood.CALM -> listOf("Keep it light today", "Start with one small task", "Protect your calm")
+        Mood.OKAY -> listOf("Pick something easy first", "Try a 5-minute timer")
+        Mood.DISTRACTED -> listOf("Put phone away", "Try 5 minute session", "Remove distractions")
+        Mood.STRESSED -> listOf("Breathe slowly", "Break task into tiny steps")
         null -> emptyList()
     }
 }
 
 @Composable
-fun HomeScreen(name: String = "Kaila") {
+fun HomeScreen(
+    calmPoints: Int,
+    nextRewardGoal: Int,
+    onRewardsClick: () -> Unit
+) {
+
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
 
-    val tips = tipsFor(selectedMood)
+    val progress = calmPoints.toFloat() / nextRewardGoal
+    val pointsLeft = nextRewardGoal - calmPoints
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+
+        // ⭐ Calm Points Bar
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onRewardsClick() },
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(Modifier.padding(14.dp)) {
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Calm Points ", fontWeight = FontWeight.Bold)
+                    Text("$calmPoints pts")
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f,1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(50))
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    if (pointsLeft <= 0)
+                        "Reward unlocked! Tap to redeem 🎁"
+                    else
+                        "$pointsLeft points until next gift card 🎁"
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
         Text(
-            text = "Hi $name 👋",
+            text = "How are you feeling today?",
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.Bold
         )
-
-        Spacer(Modifier.height(12.dp))
-
-        Text("How are you feeling today?")
 
         Spacer(Modifier.height(16.dp))
 
@@ -58,63 +101,54 @@ fun HomeScreen(name: String = "Kaila") {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
+
             Mood.values().forEach { mood ->
+
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(
                             if (selectedMood == mood)
                                 MaterialTheme.colorScheme.primaryContainer
                             else
                                 MaterialTheme.colorScheme.surfaceVariant
                         )
-                        .clickable {
-                            selectedMood = mood
-                            println("Mood logged: ${mood.name}")
-                        },
+                        .clickable { selectedMood = mood },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = mood.emoji, style = MaterialTheme.typography.headlineMedium)
+                    Text(mood.emoji, style = MaterialTheme.typography.headlineMedium)
                 }
+
             }
+
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // Show tips after selection
         if (selectedMood != null) {
+
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Text(
-                        text = "Quick tips for ${selectedMood!!.label}",
-                        fontWeight = FontWeight.SemiBold
-                    )
+
+                    Text("Quick tips", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    tips.take(5).forEach { tip ->
-                        Text("• $tip")
+
+                    tipsFor(selectedMood).forEach {
+                        Text("• $it")
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+            Text("Thanks for checking in 🌱")
 
-            Text(
-                text = "Thanks for checking in 🌱",
-                fontWeight = FontWeight.Medium
-            )
         }
-    }
-}
 
-@Preview(showBackground = true)
-@Composable
-fun HomePreview() {
-    ConsoliCalmTheme {
-        HomeScreen()
     }
 }
 
