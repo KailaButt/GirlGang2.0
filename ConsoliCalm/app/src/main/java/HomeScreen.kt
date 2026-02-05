@@ -29,6 +29,27 @@ private fun tipsFor(mood: Mood?): List<String> {
     }
 }
 
+private fun microStepFor(reason: String): String {
+    val r = reason.lowercase()
+    return when {
+        r.contains("tired") || r.contains("exhaust") -> "Micro-step: set a 5-minute timer and do the easiest part only."
+        r.contains("overwhelm") || r.contains("too much") -> "Micro-step: write a 3-item mini list. Start with the smallest."
+        r.contains("phone") || r.contains("scroll") -> "Micro-step: put your phone face down for 5 minutes."
+        r.contains("don’t know") || r.contains("confused") -> "Micro-step: open the assignment and read only the instructions."
+        else -> "Micro-step: do 2 minutes of setup (open tabs, gather materials)."
+    }
+}
+
+private val QUOTES = listOf(
+    "Start where you are. Use what you have. Do what you can.",
+    "Small steps count.",
+    "Progress, not perfection.",
+    "You only have to start.",
+    "One focused minute is still a win."
+)
+
+private fun randomQuote(): String = QUOTES.random()
+
 @Composable
 fun HomeScreen(
     calmPoints: Int,
@@ -37,6 +58,12 @@ fun HomeScreen(
 ) {
 
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
+
+    var quote by remember { mutableStateOf(randomQuote()) }
+
+    // ✅ Added for Feature 2: Reason textbox + micro-step output
+    var reasonText by remember { mutableStateOf("") }
+    var microStep by remember { mutableStateOf<String?>(null) }
 
     val progress = calmPoints.toFloat() / nextRewardGoal
     val pointsLeft = nextRewardGoal - calmPoints
@@ -84,6 +111,29 @@ fun HomeScreen(
                     else
                         "$pointsLeft points until next gift card 🎁"
                 )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // 💬 Daily Quote
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Daily quote", fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text("“$quote”")
             }
         }
 
@@ -146,9 +196,50 @@ fun HomeScreen(
 
             Spacer(Modifier.height(10.dp))
             Text("Thanks for checking in 🌱")
-
         }
 
+        // ✅ Added for Feature 2: Reason + Micro-step (UI placeholder)
+        Spacer(Modifier.height(20.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(Modifier.padding(14.dp)) {
+
+                Text("What’s making it hard to start?", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = reasonText,
+                    onValueChange = { reasonText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ex: I feel overwhelmed…") },
+                    singleLine = false,
+                    minLines = 2
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Button(
+                    onClick = {
+                        microStep = if (reasonText.isBlank()) null else microStepFor(reasonText)
+                    },
+                    enabled = reasonText.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get a micro-step")
+                }
+
+                if (microStep != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(microStep!!)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Suggested next step: try a 5-minute focus session ⏱️")
+                }
+            }
+        }
     }
 }
-
