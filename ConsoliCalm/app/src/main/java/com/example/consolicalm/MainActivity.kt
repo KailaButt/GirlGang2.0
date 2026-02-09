@@ -29,7 +29,8 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             calmPoints = calmPoints,
                             nextRewardGoal = 500,
-                            onRewardsClick = { showRewards = true }
+                            onRewardsClick = { showRewards = true },
+                            onEarnPoints = { earned -> calmPoints += earned } // ✅ NEW
                         )
                     }
 
@@ -38,4 +39,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

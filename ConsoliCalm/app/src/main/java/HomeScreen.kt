@@ -3,7 +3,9 @@ package com.example.consolicalm
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,12 @@ enum class Mood(val emoji: String, val label: String) {
     STRESSED("😣", "Stressed")
 }
 
+data class MicroStepResult(
+    val title: String,
+    val steps: List<String>,
+    val pointsReward: Int
+)
+
 private fun tipsFor(mood: Mood?): List<String> {
     return when (mood) {
         Mood.CALM -> listOf("Keep it light today!", "Start with one small task", "Protect your calm")
@@ -29,14 +37,64 @@ private fun tipsFor(mood: Mood?): List<String> {
     }
 }
 
-private fun microStepFor(reason: String): String {
+private fun generateMicroStep(mood: Mood, reason: String): MicroStepResult {
     val r = reason.lowercase()
-    return when {
-        r.contains("tired") || r.contains("exhaust") -> "Micro-step: set a 5-minute timer and do the easiest part only."
-        r.contains("overwhelm") || r.contains("too much") -> "Micro-step: write a 3-item mini list. Start with the smallest."
-        r.contains("phone") || r.contains("scroll") -> "Micro-step: put your phone face down for 5 minutes."
-        r.contains("don’t know") || r.contains("confused") -> "Micro-step: open the assignment and read only the instructions."
-        else -> "Micro-step: do 2 minutes of setup (open tabs, gather materials)."
+
+    return when (mood) {
+        Mood.CALM -> MicroStepResult(
+            title = "Let’s start gently.",
+            steps = listOf(
+                "Pick ONE task to start (no pressure to finish)",
+                "Do 2 minutes of setup (open tabs, gather materials)",
+                "Set a 5-minute timer and begin"
+            ),
+            pointsReward = 10
+        )
+
+        Mood.OKAY -> MicroStepResult(
+            title = "Quick momentum plan.",
+            steps = listOf(
+                "Write your goal in 1 sentence",
+                "Do a 5-minute focus sprint",
+                "Stop and decide: continue or take a short break"
+            ),
+            pointsReward = 10
+        )
+
+        Mood.DISTRACTED -> MicroStepResult(
+            title = "Let’s reduce distractions first.",
+            steps = listOf(
+                "Put your phone face down or out of reach",
+                "Close extra apps/tabs (leave only what you need)",
+                "Do one 5-minute focus sprint"
+            ),
+            pointsReward = 15
+        )
+
+        Mood.STRESSED -> {
+            val stressHint = when {
+                "tired" in r || "exhaust" in r ->
+                    "Do the easiest part for 3 minutes only."
+                "overwhelm" in r || "too much" in r ->
+                    "Write a tiny 3-item list. Start with the smallest."
+                "phone" in r || "scroll" in r ->
+                    "Put your phone away for 5 minutes."
+                "don’t know" in r || "dont know" in r || "confused" in r ->
+                    "Open the assignment and read ONLY the instructions."
+                else ->
+                    "Shrink it: do the smallest possible first action."
+            }
+
+            MicroStepResult(
+                title = "Reset, then one small step.",
+                steps = listOf(
+                    "Breathe for 60 seconds: in 4, out 6",
+                    stressHint,
+                    "Start a 5-minute timer and begin"
+                ),
+                pointsReward = 20
+            )
+        }
     }
 }
 
@@ -54,27 +112,31 @@ private fun randomQuote(): String = QUOTES.random()
 fun HomeScreen(
     calmPoints: Int,
     nextRewardGoal: Int,
-    onRewardsClick: () -> Unit
+    onRewardsClick: () -> Unit,
+    onEarnPoints: (Int) -> Unit
 ) {
-
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
-
     var quote by remember { mutableStateOf(randomQuote()) }
 
-    // ✅ Added for Feature 2: Reason textbox + micro-step output
     var reasonText by remember { mutableStateOf("") }
-    var microStep by remember { mutableStateOf<String?>(null) }
+    var microStepResult by remember { mutableStateOf<MicroStepResult?>(null) }
+    var showDidIt by remember { mutableStateOf(false) }
 
-    val progress = calmPoints.toFloat() / nextRewardGoal
+    val progress = (calmPoints.toFloat() / nextRewardGoal).coerceIn(0f, 1f)
     val pointsLeft = nextRewardGoal - calmPoints
+
+    val canGetMicroStep = selectedMood != null && reasonText.trim().isNotEmpty()
+
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
 
-        // ⭐ Calm Points Bar
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,7 +158,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(8.dp))
 
                 LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f,1f) },
+                    progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(10.dp)
@@ -124,14 +186,7 @@ fun HomeScreen(
             )
         ) {
             Column(Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Daily quote", fontWeight = FontWeight.Bold)
-                }
-
+                Text("Daily quote", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
                 Text("“$quote”")
             }
@@ -151,9 +206,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-
             Mood.values().forEach { mood ->
-
                 Box(
                     modifier = Modifier
                         .size(56.dp)
@@ -164,33 +217,30 @@ fun HomeScreen(
                             else
                                 MaterialTheme.colorScheme.surfaceVariant
                         )
-                        .clickable { selectedMood = mood },
+                        .clickable {
+                            selectedMood = mood
+                            microStepResult = null
+                            showDidIt = false
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(mood.emoji, style = MaterialTheme.typography.headlineMedium)
                 }
-
             }
-
         }
 
         Spacer(Modifier.height(16.dp))
 
         if (selectedMood != null) {
-
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
                 Column(Modifier.padding(14.dp)) {
-
                     Text("Quick tips", fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-
-                    tipsFor(selectedMood).forEach {
-                        Text("• $it")
-                    }
+                    tipsFor(selectedMood).forEach { Text("• $it") }
                 }
             }
 
@@ -198,7 +248,6 @@ fun HomeScreen(
             Text("Thanks for checking in 🌱")
         }
 
-        // ✅ Added for Feature 2: Reason + Micro-step (UI placeholder)
         Spacer(Modifier.height(20.dp))
 
         Card(
@@ -214,7 +263,11 @@ fun HomeScreen(
 
                 OutlinedTextField(
                     value = reasonText,
-                    onValueChange = { reasonText = it },
+                    onValueChange = {
+                        reasonText = it
+                        microStepResult = null
+                        showDidIt = false
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Ex: I feel overwhelmed…") },
                     singleLine = false,
@@ -225,21 +278,39 @@ fun HomeScreen(
 
                 Button(
                     onClick = {
-                        microStep = if (reasonText.isBlank()) null else microStepFor(reasonText)
+                        microStepResult = generateMicroStep(selectedMood!!, reasonText)
+                        showDidIt = true
                     },
-                    enabled = reasonText.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth()
+                    enabled = canGetMicroStep,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Get a micro-step")
                 }
 
-                if (microStep != null) {
+                microStepResult?.let { result ->
                     Spacer(Modifier.height(12.dp))
-                    Text(microStep!!)
+                    Text(result.title, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Text("Suggested next step: try a 5-minute focus session ⏱️")
+                    result.steps.forEach { Text("• $it") }
+
+                    if (showDidIt) {
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = {
+                                onEarnPoints(result.pointsReward)
+                                showDidIt = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text("I did it  (+${result.pointsReward} pts)")
+                        }
+                    }
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
     }
 }
