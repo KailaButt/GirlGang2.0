@@ -113,6 +113,8 @@ fun HomeScreen(
     calmPoints: Int,
     nextRewardGoal: Int,
     onRewardsClick: () -> Unit,
+    onTodoClick: () -> Unit,
+    onMeditationClick: () -> Unit,
     onEarnPoints: (Int) -> Unit
 ) {
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
@@ -176,9 +178,28 @@ fun HomeScreen(
             }
         }
 
+
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onTodoClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text("To-Do List ✿")
+        }
+
+        Spacer(Modifier.height(10.dp))
+        OutlinedButton(
+            onClick = onMeditationClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text("Meditation & Breathing ☾")
+        }
+
         Spacer(Modifier.height(20.dp))
 
-        // 💬 Daily Quote
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -250,6 +271,7 @@ fun HomeScreen(
 
         Spacer(Modifier.height(20.dp))
 
+        
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(

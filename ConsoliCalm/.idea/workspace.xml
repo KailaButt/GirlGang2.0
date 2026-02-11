@@ -4,12 +4,12 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="150eebf1-2390-46a5-945b-8adb34b4d6ae" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+    <list default="true" id="0079e68b-4393-47da-801f-15f357f0ee81" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.kotlin/errors/errors-1770665376583.log" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/HomeScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/HomeScreen.kt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/consolicalm/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/consolicalm/MainActivity.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradlew" beforeDir="false" afterPath="$PROJECT_DIR$/gradlew" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,7 +44,7 @@
   "customColor": "",
   "associatedIndex": 8
 }]]></component>
-  <component name="ProjectId" id="39RiXQVcohMKlURiBrEP4JJsdaM" />
+  <component name="ProjectId" id="39Uwtvl1s6011V204l7Ix9VD8zv" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -140,11 +140,11 @@
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="150eebf1-2390-46a5-945b-8adb34b4d6ae" name="Changes" comment="" />
-      <created>1770665323976</created>
+      <changelist id="0079e68b-4393-47da-801f-15f357f0ee81" name="Changes" comment="" />
+      <created>1770764177211</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1770665323976</updated>
+      <updated>1770764177211</updated>
     </task>
     <servers />
   </component>
