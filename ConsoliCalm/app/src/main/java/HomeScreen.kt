@@ -115,6 +115,7 @@ fun HomeScreen(
     onRewardsClick: () -> Unit,
     onTodoClick: () -> Unit,
     onMeditationClick: () -> Unit,
+    onStudyClick: () -> Unit,          // ✅ ADDED
     onEarnPoints: (Int) -> Unit
 ) {
     var selectedMood by remember { mutableStateOf<Mood?>(null) }
@@ -137,7 +138,6 @@ fun HomeScreen(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-
 
         Card(
             modifier = Modifier
@@ -178,6 +178,16 @@ fun HomeScreen(
             }
         }
 
+        Spacer(Modifier.height(10.dp))
+
+        // ✅ NEW: Study button
+        OutlinedButton(
+            onClick = onStudyClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text("Study Timer ⏱️")
+        }
 
         Spacer(Modifier.height(10.dp))
         OutlinedButton(
@@ -198,7 +208,6 @@ fun HomeScreen(
         }
 
         Spacer(Modifier.height(20.dp))
-
 
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -271,7 +280,6 @@ fun HomeScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
@@ -336,3 +344,4 @@ fun HomeScreen(
         Spacer(Modifier.height(24.dp))
     }
 }
+

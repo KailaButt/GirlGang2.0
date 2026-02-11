@@ -1,22 +1,18 @@
 package com.example.consolicalm
 
-import android.content.Intent
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -186,7 +182,6 @@ fun MeditationScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
             Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
@@ -205,26 +200,17 @@ fun MeditationScreen(
 
             SectionTitle("Quick breathing")
             breathing.forEach { res ->
-                ResourceCard(
-                    resource = res,
-                    onOpen = { openUrl(res.url) }
-                )
+                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
             }
 
             SectionTitle("Short meditations")
             shortMeditations.forEach { res ->
-                ResourceCard(
-                    resource = res,
-                    onOpen = { openUrl(res.url) }
-                )
+                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
             }
 
             SectionTitle("Longer sessions")
             longerSessions.forEach { res ->
-                ResourceCard(
-                    resource = res,
-                    onOpen = { openUrl(res.url) }
-                )
+                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
             }
         }
     }
@@ -317,3 +303,4 @@ private fun PracticeCard(
         }
     }
 }
+

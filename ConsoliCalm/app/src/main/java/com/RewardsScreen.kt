@@ -20,7 +20,6 @@ fun RewardsScreen(
     calmPoints: Int,
     onBack: () -> Unit
 ) {
-
     val rewards = listOf(
         RewardOption("Amazon Gift Card", 500, "Shop anything"),
         RewardOption("Starbucks Gift Card", 900, "Coffee reward ☕"),
@@ -33,7 +32,6 @@ fun RewardsScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -43,13 +41,10 @@ fun RewardsScreen(
         }
 
         Spacer(Modifier.height(8.dp))
-
         Text("You have $calmPoints Calm Points 🌿")
-
         Spacer(Modifier.height(16.dp))
 
         rewards.forEach { reward ->
-
             val canRedeem = calmPoints >= reward.pointsCost
 
             Card(
@@ -59,9 +54,7 @@ fun RewardsScreen(
                     .clickable(enabled = canRedeem) {},
                 shape = RoundedCornerShape(18.dp)
             ) {
-
                 Column(Modifier.padding(14.dp)) {
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -81,18 +74,13 @@ fun RewardsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (canRedeem)
-                                "Redeem"
-                            else
-                                "Need ${reward.pointsCost - calmPoints} more points"
+                            if (canRedeem) "Redeem"
+                            else "Need ${reward.pointsCost - calmPoints} more points"
                         )
                     }
-
                 }
-
             }
-
         }
-
     }
 }
+

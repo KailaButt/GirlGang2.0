@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.UUID
-import androidx.compose.material3.ExperimentalMaterial3Api
-
 
 data class TodoItem(
     val id: String = UUID.randomUUID().toString(),
@@ -109,7 +107,6 @@ fun TodoScreen(
             }
         }
 
-        // Add dialog
         if (showAddDialog) {
             TaskDialog(
                 title = "Add a task",
@@ -123,7 +120,6 @@ fun TodoScreen(
             )
         }
 
-        // Edit dialog
         editing?.let { item ->
             TaskDialog(
                 title = "Edit task",
