@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.example.consolicalm.com.example.consolicalm.ui.theme.HomeScreen
 import com.example.consolicalm.ui.theme.ConsoliCalmTheme
 
 enum class AppTab(val label: String, val icon: ImageVector) {
