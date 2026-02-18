@@ -107,7 +107,8 @@ class MainActivity : ComponentActivity() {
                             )
 
                             AppTab.CALM -> MeditationScreen(
-                                onBack = { currentTab = AppTab.HOME }
+                                onBack = { currentTab = AppTab.HOME },
+                                onEarnPoints = { earned -> calmPoints += earned }
                             )
 
                             AppTab.TODO -> TodoScreen(

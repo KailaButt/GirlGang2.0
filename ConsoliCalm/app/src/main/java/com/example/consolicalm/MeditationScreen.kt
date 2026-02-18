@@ -11,6 +11,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,19 +28,36 @@ data class MeditationResource(
     val url: String
 )
 
-data class InAppPractice(
-    val title: String,
-    val summary: String,
-    val timeLabel: String,
-    val steps: String
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MeditationScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onEarnPoints: (Int) -> Unit
 ) {
     val context = LocalContext.current
+
+    // ---- Calm progress (streak / daily goal / challenge) ----
+    val prefs = remember(context) { CalmPrefs(context) }
+    val sessions = remember { defaultCalmSessions() }
+    val todayKey = remember { prefs.getTodayKey() }
+
+    var streakCount by remember { mutableIntStateOf(0) }
+    var sessionsToday by remember { mutableIntStateOf(0) }
+    var challengeDone by remember { mutableStateOf(false) }
+
+    // Session player state
+    var activeSession by remember { mutableStateOf<CalmSession?>(null) }
+    var activeIsChallenge by remember { mutableStateOf(false) }
+
+    fun refreshProgress() {
+        streakCount = prefs.streakCount
+        sessionsToday = if (prefs.todaySessionsKey == todayKey) prefs.todaySessionsCount else 0
+        challengeDone = prefs.challengeCompletedKey == todayKey
+    }
+
+    LaunchedEffect(Unit) {
+        refreshProgress()
+    }
 
     fun openUrl(url: String) {
         try {
@@ -47,6 +66,17 @@ fun MeditationScreen(
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(context, "No app found to open links.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // Daily Calm Challenge rotates based on the day.
+    val challengeBase = sessions[(todayKey % sessions.size).coerceAtLeast(0)]
+    val dailyChallenge = remember(challengeBase) {
+        // Slightly shorter and higher reward for the daily challenge.
+        challengeBase.copy(
+            id = "daily_${challengeBase.id}",
+            estimatedSeconds = challengeBase.estimatedSeconds.coerceAtMost(150),
+            points = 5
+        )
     }
 
     val breathing = listOf(
@@ -94,73 +124,6 @@ fun MeditationScreen(
         )
     )
 
-    val inAppPractices = listOf(
-        InAppPractice(
-            title = "5-4-3-2-1 grounding",
-            summary = "Use your senses to anchor back to the present moment.",
-            timeLabel = "2–4 min",
-            steps = "1) Name 5 things you can SEE.\n" +
-                    "2) Name 4 things you can FEEL (touch, clothing, feet on the floor).\n" +
-                    "3) Name 3 things you can HEAR.\n" +
-                    "4) Name 2 things you can SMELL (or two smells you like).\n" +
-                    "5) Name 1 thing you can TASTE (or one taste you like).\n\n" +
-                    "Finish with one slow breath in and a longer breath out."
-        ),
-        InAppPractice(
-            title = "Box breathing (4-4-4-4)",
-            summary = "A steady rhythm that can calm your body fast.",
-            timeLabel = "2–3 min",
-            steps = "Repeat 3–5 rounds:\n" +
-                    "• Inhale through your nose for 4\n" +
-                    "• Hold for 4\n" +
-                    "• Exhale slowly for 4\n" +
-                    "• Hold for 4\n\n" +
-                    "Tip: Keep the exhale gentle—don’t force it."
-        ),
-        InAppPractice(
-            title = "STOP skill",
-            summary = "A quick reset when your mind is racing.",
-            timeLabel = "1–2 min",
-            steps = "S — Stop. Pause for a moment.\n" +
-                    "T — Take a breath. One slow inhale + longer exhale.\n" +
-                    "O — Observe. What am I feeling in my body? What thoughts are here?\n" +
-                    "P — Proceed. Choose one small next step."
-        ),
-        InAppPractice(
-            title = "4-7-8 relaxing breath",
-            summary = "A calming pattern that can help with stress or winding down.",
-            timeLabel = "2–3 min",
-            steps = "Repeat 3–4 times:\n" +
-                    "• Inhale through your nose for 4\n" +
-                    "• Hold for 7\n" +
-                    "• Exhale through your mouth for 8\n\n" +
-                    "If you feel lightheaded, return to normal breathing."
-        ),
-        InAppPractice(
-            title = "Mini body scan",
-            summary = "Release tension by checking in from head to toe.",
-            timeLabel = "3–5 min",
-            steps = "Start at the top of your head and move down slowly:\n" +
-                    "• Forehead/jaw: unclench\n" +
-                    "• Shoulders: drop them down\n" +
-                    "• Chest/belly: soften as you exhale\n" +
-                    "• Hands: relax your grip\n" +
-                    "• Legs/feet: feel them supported\n\n" +
-                    "Name one spot that feels calmer than before."
-        ),
-        InAppPractice(
-            title = "Progressive muscle relax (quick)",
-            summary = "Tense then release to signal safety to your body.",
-            timeLabel = "4–6 min",
-            steps = "For each area: tense 5 seconds → release 10 seconds.\n" +
-                    "1) Hands (make fists)\n" +
-                    "2) Shoulders (shrug up)\n" +
-                    "3) Face (scrunch)\n" +
-                    "4) Legs (tighten thighs)\n" +
-                    "5) Feet (curl toes)\n\n" +
-                    "End with a slow breath out and notice the difference."
-        )
-    )
 
     Scaffold(
         topBar = {
@@ -192,10 +155,134 @@ fun MeditationScreen(
                 }
             }
 
-            SectionTitle("In-app grounding & mindfulness")
-            Text("Tap a card to read the steps.")
-            inAppPractices.forEach { practice ->
-                PracticeCard(practice = practice)
+            // --- Progress / streak / daily goal ---
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Daily Calm Goal", fontWeight = FontWeight.Bold)
+                            Text("Complete 1 Calm session")
+                        }
+                        AssistChip(
+                            onClick = { },
+                            enabled = false,
+                            label = { Text(if (sessionsToday >= 1) "Done" else "0/1") }
+                        )
+                    }
+
+                    LinearProgressIndicator(
+                        progress = (sessionsToday.coerceAtMost(1) / 1f).coerceIn(0f, 1f)
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.LocalFireDepartment, contentDescription = null)
+                        Text("Streak: ${streakCount.coerceAtLeast(0)} day${if (streakCount == 1) "" else "s"}")
+                        Spacer(Modifier.weight(1f))
+                        Text("Today: $sessionsToday session${if (sessionsToday == 1) "" else "s"}")
+                    }
+                }
+            }
+
+            // --- Daily Calm Challenge ---
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Star, contentDescription = null)
+                            Column {
+                                Text("Today's Calm Challenge", fontWeight = FontWeight.Bold)
+                                Text(dailyChallenge.title)
+                            }
+                        }
+
+                        AssistChip(
+                            onClick = { },
+                            enabled = false,
+                            label = { Text(if (challengeDone) "Completed" else "+${dailyChallenge.points} pts") }
+                        )
+                    }
+
+                    Text(dailyChallenge.description)
+
+                    Button(
+                        onClick = {
+                            activeIsChallenge = true
+                            activeSession = dailyChallenge
+                        },
+                        enabled = !challengeDone,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (challengeDone) "Completed" else "Start challenge")
+                    }
+                }
+            }
+
+            // --- Guided Calm Sessions (interactive) ---
+            SectionTitle("Guided Calm sessions")
+            Text("Tap Start to follow step-by-step with a timer.")
+            sessions.forEach { s ->
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(s.title, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(s.description)
+                        }
+
+                        Spacer(Modifier.width(12.dp))
+
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AssistChip(
+                                onClick = { },
+                                enabled = false,
+                                label = { Text("~${(s.estimatedSeconds / 60).coerceAtLeast(1)} min") }
+                            )
+                            Button(
+                                onClick = {
+                                    activeIsChallenge = false
+                                    activeSession = s
+                                }
+                            ) { Text("Start") }
+                        }
+                    }
+                }
             }
 
             SectionTitle("Quick breathing")
@@ -213,6 +300,27 @@ fun MeditationScreen(
                 ResourceCard(resource = res, onOpen = { openUrl(res.url) })
             }
         }
+    }
+
+    // Full-screen guided session player
+    activeSession?.let { session ->
+        CalmSessionPlayer(
+            session = session,
+            isDailyChallenge = activeIsChallenge,
+            onClose = {
+                activeSession = null
+                activeIsChallenge = false
+                refreshProgress()
+            },
+            onCompleted = { earnedPoints ->
+                prefs.recordSessionCompleted()
+                if (activeIsChallenge) {
+                    prefs.challengeCompletedKey = todayKey
+                }
+                refreshProgress()
+                onEarnPoints(earnedPoints)
+            }
+        )
     }
 }
 
@@ -257,49 +365,6 @@ private fun ResourceCard(
                 onClick = onOpen,
                 label = { Text(resource.durationLabel) }
             )
-        }
-    }
-}
-
-@Composable
-private fun PracticeCard(
-    practice: InAppPractice
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(practice.title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Spacer(Modifier.width(12.dp))
-                AssistChip(onClick = { expanded = !expanded }, label = { Text(practice.timeLabel) })
-            }
-
-            Text(practice.summary)
-
-            if (expanded) {
-                Divider()
-                Text(practice.steps)
-            }
-
-            TextButton(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "Hide" else "Show steps")
-            }
         }
     }
 }
