@@ -7,6 +7,8 @@ import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -18,8 +20,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class MeditationResource(
     val title: String,
@@ -38,12 +44,18 @@ fun MeditationScreen(
 
     // ---- Calm progress (streak / daily goal / challenge) ----
     val prefs = remember(context) { CalmPrefs(context) }
+    val toolkitPrefs = remember(context) { CalmToolkitPrefs(context) }
     val sessions = remember { defaultCalmSessions() }
     val todayKey = remember { prefs.getTodayKey() }
 
     var streakCount by remember { mutableIntStateOf(0) }
     var sessionsToday by remember { mutableIntStateOf(0) }
     var challengeDone by remember { mutableStateOf(false) }
+
+    // Favorites + history
+    var favorites by remember { mutableStateOf(setOf<String>()) }
+    var history by remember { mutableStateOf(listOf<CalmHistoryEntry>()) }
+    var showHistory by remember { mutableStateOf(false) }
 
     // Session player state
     var activeSession by remember { mutableStateOf<CalmSession?>(null) }
@@ -53,6 +65,9 @@ fun MeditationScreen(
         streakCount = prefs.streakCount
         sessionsToday = if (prefs.todaySessionsKey == todayKey) prefs.todaySessionsCount else 0
         challengeDone = prefs.challengeCompletedKey == todayKey
+
+        favorites = toolkitPrefs.getFavorites()
+        history = toolkitPrefs.getHistoryEntries()
     }
 
     LaunchedEffect(Unit) {
@@ -123,6 +138,24 @@ fun MeditationScreen(
             url = "https://www.youtube.com/c/headspace/videos"
         )
     )
+
+    val allResources = remember(breathing, shortMeditations, longerSessions) {
+        breathing + shortMeditations + longerSessions
+    }
+
+    fun resourceKey(res: MeditationResource): String = "resource:${res.url}"
+    fun sessionKey(session: CalmSession): String = "session:${session.id}"
+    fun toggleFavorite(key: String) {
+        toolkitPrefs.toggleFavorite(key)
+        favorites = toolkitPrefs.getFavorites()
+    }
+
+    val favoriteSessions = remember(favorites, sessions) {
+        sessions.filter { favorites.contains(sessionKey(it)) }
+    }
+    val favoriteResources = remember(favorites, allResources) {
+        allResources.filter { favorites.contains(resourceKey(it)) }
+    }
 
 
     Scaffold(
@@ -244,6 +277,82 @@ fun MeditationScreen(
                 }
             }
 
+            // --- My Toolkit (favorites) ---
+            SectionTitle("My Toolkit")
+            if (favoriteSessions.isEmpty() && favoriteResources.isEmpty()) {
+                Text("Star a session or resource to save it here.")
+            } else {
+                if (favoriteSessions.isNotEmpty()) {
+                    Text("Saved sessions", fontWeight = FontWeight.SemiBold)
+                    favoriteSessions.forEach { s ->
+                        Card(
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(s.title, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(s.description, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                IconButton(onClick = { toggleFavorite(sessionKey(s)) }) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        contentDescription = "Unfavorite",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        activeIsChallenge = false
+                                        activeSession = s
+                                    }
+                                ) { Text("Start") }
+                            }
+                        }
+                    }
+                }
+
+                if (favoriteResources.isNotEmpty()) {
+                    Text("Saved resources", fontWeight = FontWeight.SemiBold)
+                    favoriteResources.forEach { res ->
+                        ResourceCard(
+                            resource = res,
+                            isFavorite = true,
+                            onToggleFavorite = { toggleFavorite(resourceKey(res)) },
+                            onOpen = { openUrl(res.url) }
+                        )
+                    }
+                }
+            }
+
+            // --- Calm history ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SectionTitle("Calm History")
+                TextButton(onClick = { showHistory = true }, enabled = history.isNotEmpty()) {
+                    Text("View all")
+                }
+            }
+            if (history.isEmpty()) {
+                Text("Complete a guided session to start your history log.")
+            } else {
+                history.take(3).forEach { entry ->
+                    HistoryRow(entry = entry)
+                }
+            }
+
             // --- Guided Calm Sessions (interactive) ---
             SectionTitle("Guided Calm sessions")
             Text("Tap Start to follow step-by-step with a timer.")
@@ -274,6 +383,16 @@ fun MeditationScreen(
                                 enabled = false,
                                 label = { Text("~${(s.estimatedSeconds / 60).coerceAtLeast(1)} min") }
                             )
+
+                            IconButton(onClick = { toggleFavorite(sessionKey(s)) }) {
+                                val isFav = favorites.contains(sessionKey(s))
+                                Icon(
+                                    Icons.Default.Star,
+                                    contentDescription = if (isFav) "Unfavorite" else "Favorite",
+                                    tint = if (isFav) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+
                             Button(
                                 onClick = {
                                     activeIsChallenge = false
@@ -287,17 +406,32 @@ fun MeditationScreen(
 
             SectionTitle("Quick breathing")
             breathing.forEach { res ->
-                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
+                ResourceCard(
+                    resource = res,
+                    isFavorite = favorites.contains(resourceKey(res)),
+                    onToggleFavorite = { toggleFavorite(resourceKey(res)) },
+                    onOpen = { openUrl(res.url) }
+                )
             }
 
             SectionTitle("Short meditations")
             shortMeditations.forEach { res ->
-                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
+                ResourceCard(
+                    resource = res,
+                    isFavorite = favorites.contains(resourceKey(res)),
+                    onToggleFavorite = { toggleFavorite(resourceKey(res)) },
+                    onOpen = { openUrl(res.url) }
+                )
             }
 
             SectionTitle("Longer sessions")
             longerSessions.forEach { res ->
-                ResourceCard(resource = res, onOpen = { openUrl(res.url) })
+                ResourceCard(
+                    resource = res,
+                    isFavorite = favorites.contains(resourceKey(res)),
+                    onToggleFavorite = { toggleFavorite(resourceKey(res)) },
+                    onOpen = { openUrl(res.url) }
+                )
             }
         }
     }
@@ -317,8 +451,45 @@ fun MeditationScreen(
                 if (activeIsChallenge) {
                     prefs.challengeCompletedKey = todayKey
                 }
+
+                // history log (date + session + minutes)
+                val minutes = ((session.estimatedSeconds + 59) / 60).coerceAtLeast(1)
+                toolkitPrefs.addHistoryEntry(
+                    CalmHistoryEntry(
+                        timestampMillis = System.currentTimeMillis(),
+                        title = session.title,
+                        minutes = minutes
+                    )
+                )
+
                 refreshProgress()
                 onEarnPoints(earnedPoints)
+            }
+        )
+    }
+
+    if (showHistory) {
+        AlertDialog(
+            onDismissRequest = { showHistory = false },
+            confirmButton = {
+                TextButton(onClick = { showHistory = false }) { Text("Close") }
+            },
+            title = { Text("Calm History") },
+            text = {
+                if (history.isEmpty()) {
+                    Text("No sessions completed yet.")
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 420.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(history) { entry ->
+                            HistoryRow(entry = entry)
+                        }
+                    }
+                }
             }
         )
     }
@@ -337,6 +508,8 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun ResourceCard(
     resource: MeditationResource,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onOpen: () -> Unit
 ) {
     Card(
@@ -361,9 +534,47 @@ private fun ResourceCard(
 
             Spacer(Modifier.width(12.dp))
 
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    Icons.Default.Star,
+                    contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                )
+            }
+
             AssistChip(
                 onClick = onOpen,
                 label = { Text(resource.durationLabel) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(entry: CalmHistoryEntry) {
+    val fmt = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+    val dateStr = remember(entry.timestampMillis) { fmt.format(Date(entry.timestampMillis)) }
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(entry.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                Text(dateStr)
+            }
+            AssistChip(
+                onClick = { },
+                enabled = false,
+                label = { Text("${entry.minutes} min") }
             )
         }
     }
