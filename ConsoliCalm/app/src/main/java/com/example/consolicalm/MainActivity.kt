@@ -15,17 +15,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.example.consolicalm.com.example.consolicalm.ui.theme.HomeScreen
 import com.example.consolicalm.ui.theme.ConsoliCalmTheme
-import com.example.consolicalm.MainActivity
+import androidx.compose.material.icons.filled.Person
 
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Filled.Home),
+
+    PROFILE("Profile", Icons.Filled.Person),
     STUDY("Study", Icons.Filled.Timer),
     TODO("To-Do", Icons.Filled.CheckCircle),
     CALM("Calm", Icons.Filled.Favorite),
     REWARDS("Rewards", Icons.Filled.CardGiftcard)
+
 }
 
 class MainActivity : ComponentActivity() {
@@ -108,6 +110,10 @@ class MainActivity : ComponentActivity() {
                                 onBack = { currentTab = AppTab.HOME }
                             )
 
+                            AppTab.PROFILE -> ProfileScreen(
+                                onBack = { currentTab = AppTab.HOME }
+                            )
+
                             AppTab.CALM -> MeditationScreen(
                                 onBack = { currentTab = AppTab.HOME },
                                 onEarnPoints = { earned -> calmPoints += earned }
@@ -154,6 +160,7 @@ class MainActivity : ComponentActivity() {
                             AppTab.HOME -> HomeScreen(
                                 calmPoints = calmPoints,
                                 nextRewardGoal = 500,
+                                onProfileClick = { currentTab = AppTab.PROFILE },
                                 onRewardsClick = { currentTab = AppTab.REWARDS },
                                 onTodoClick = { currentTab = AppTab.TODO },
                                 onMeditationClick = { currentTab = AppTab.CALM },
