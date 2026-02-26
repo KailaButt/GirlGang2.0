@@ -1,64 +1,79 @@
 package com.example.consolicalm
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.example.consolicalm.ui.theme.AppTheme
 import com.example.consolicalm.ui.theme.ConsoliCalmTheme
-import androidx.compose.material.icons.filled.Person
-
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Filled.Home),
-
     PROFILE("Profile", Icons.Filled.Person),
     STUDY("Study", Icons.Filled.Timer),
     TODO("To-Do", Icons.Filled.CheckCircle),
     CALM("Calm", Icons.Filled.Favorite),
     REWARDS("Rewards", Icons.Filled.CardGiftcard)
-
 }
 
 class MainActivity : ComponentActivity() {
+
+    // ---- SharedPreferences Key ----
+    private val PREFS = "consoli_prefs"
+    private val KEY_POINTS = "calm_points"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setContent {
-            ConsoliCalmTheme {
-                var calmPoints by remember { mutableIntStateOf(240) }
+
+            val prefs = remember {
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            }
+
+            // ---- Load saved Calm Points (default 240 first time) ----
+            var calmPoints by remember {
+                mutableIntStateOf(prefs.getInt(KEY_POINTS, 240))
+            }
+
+            // ---- Auto-save whenever points change ----
+            LaunchedEffect(calmPoints) {
+                prefs.edit().putInt(KEY_POINTS, calmPoints).apply()
+            }
+
+            // ✅ Theme state (only stored while app is open)
+            var selectedTheme by remember { mutableStateOf(AppTheme.DEFAULT) }
+
+            // ✅ Wrap the whole app with the selected theme
+            ConsoliCalmTheme(appTheme = selectedTheme) {
+
                 var currentTab by remember { mutableStateOf(AppTab.HOME) }
                 val todoItems = remember { mutableStateListOf<TodoItem>() }
 
-                // ---- Focus Lock state shared with StudyScreen ----
-                var focusRunning by remember { mutableStateOf(false) } // running + focus only
-                var breakRunning by remember { mutableStateOf(false) } // running + break
+                // Focus Lock State
+                var focusRunning by remember { mutableStateOf(false) }
+                var breakRunning by remember { mutableStateOf(false) }
                 var strikes by remember { mutableIntStateOf(0) }
-                var pauseRequestToken by remember { mutableIntStateOf(0) } // bump to request pause from Study
+                var pauseRequestToken by remember { mutableIntStateOf(0) }
 
-                // ---- Popup state ----
                 var showStrikeDialog by remember { mutableStateOf(false) }
                 var strikeMessage by remember { mutableStateOf("") }
 
                 fun handleLeaveAttempt(target: AppTab) {
-                    // Allowed if not in focus running (paused or break)
                     val locked = focusRunning && !breakRunning
                     if (!locked) {
                         currentTab = target
                         return
                     }
 
-                    // They tried to leave during running focus => strike
                     strikes += 1
                     when (strikes) {
                         1 -> {
@@ -77,13 +92,10 @@ class MainActivity : ComponentActivity() {
                         else -> {
                             calmPoints -= 10
                             strikeMessage =
-                                "⛔ Strike 3\n\nTimer paused.\n-10 Calm Points.\nYou can leave now, but try again when ready."
+                                "⛔ Strike 3\n\nTimer paused.\n-10 Calm Points."
                             showStrikeDialog = true
 
-                            // request pause inside StudyScreen
                             pauseRequestToken += 1
-
-                            // Now allow leaving after strike 3
                             currentTab = target
                         }
                     }
@@ -103,14 +115,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 ) { innerPadding ->
+
                     Surface(modifier = Modifier.padding(innerPadding)) {
                         when (currentTab) {
+
                             AppTab.REWARDS -> RewardsScreen(
                                 calmPoints = calmPoints,
                                 onBack = { currentTab = AppTab.HOME }
                             )
 
                             AppTab.PROFILE -> ProfileScreen(
+                                selectedTheme = selectedTheme,
+                                onSelectTheme = { theme -> selectedTheme = theme },
                                 onBack = { currentTab = AppTab.HOME }
                             )
 
@@ -122,16 +138,20 @@ class MainActivity : ComponentActivity() {
                             AppTab.TODO -> TodoScreen(
                                 items = todoItems,
                                 onAdd = { text ->
-                                    if (text.isNotBlank()) todoItems.add(TodoItem(text = text.trim()))
+                                    if (text.isNotBlank()) {
+                                        todoItems.add(TodoItem(text = text.trim()))
+                                    }
                                 },
                                 onToggle = { id, checked ->
                                     val idx = todoItems.indexOfFirst { it.id == id }
-                                    if (idx != -1) todoItems[idx] = todoItems[idx].copy(isDone = checked)
+                                    if (idx != -1)
+                                        todoItems[idx] = todoItems[idx].copy(isDone = checked)
                                 },
                                 onEdit = { id, newText ->
                                     val idx = todoItems.indexOfFirst { it.id == id }
                                     if (idx != -1 && newText.isNotBlank()) {
-                                        todoItems[idx] = todoItems[idx].copy(text = newText.trim())
+                                        todoItems[idx] =
+                                            todoItems[idx].copy(text = newText.trim())
                                     }
                                 },
                                 onDelete = { id -> todoItems.removeAll { it.id == id } },
@@ -141,18 +161,13 @@ class MainActivity : ComponentActivity() {
                             AppTab.STUDY -> StudyScreen(
                                 onBack = { currentTab = AppTab.HOME },
                                 onSessionComplete = { earned -> calmPoints += earned },
-                                // NEW: tell MainActivity whether focus/break is running
                                 onFocusState = { isRunningFocus, isRunningBreak ->
                                     focusRunning = isRunningFocus || isRunningBreak
                                     breakRunning = isRunningBreak
 
-                                    // Optional: if focus starts while user is not on study, force them back
                                     if (isRunningFocus && currentTab != AppTab.STUDY) {
                                         currentTab = AppTab.STUDY
                                     }
-
-                                    // reset strikes each time they start a fresh focus (optional)
-                                    // if (isRunningFocus) strikes = 0
                                 },
                                 pauseRequestToken = pauseRequestToken
                             )
@@ -185,6 +200,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-
-

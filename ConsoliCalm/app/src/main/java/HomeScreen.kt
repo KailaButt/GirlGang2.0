@@ -1,5 +1,6 @@
 package com.example.consolicalm
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +54,16 @@ fun HomeScreen(
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
     }.time
+
+    // ----------------- 🔥 APP OPEN STREAK -----------------
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("consoli_prefs", Context.MODE_PRIVATE) }
+    var openStreak by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        openStreak = updateAppOpenStreak(prefs, today)
+    }
+    // ------------------------------------------------------
 
     val scope = rememberCoroutineScope()
 
@@ -103,9 +115,11 @@ fun HomeScreen(
     // Initialize with sample data for the past 30 days
     LaunchedEffect(Unit) {
         if (moodEntries.isEmpty()) {
-            val moods = listOf("😊", "😊", "😐", "😊", "😴", "😊", "😔", "😊", "😐", "😤",
+            val moods = listOf(
+                "😊", "😊", "😐", "😊", "😴", "😊", "😔", "😊", "😐", "😤",
                 "😊", "😐", "😊", "😴", "😊", "😐", "😊", "😔", "😊", "😐",
-                "😊", "😴", "😊", "😤", "😊", "😐", "😊", "😔", "😊", "😐")
+                "😊", "😴", "😊", "😤", "😊", "😐", "😊", "😔", "😊", "😐"
+            )
             for (i in 0 until 30) {
                 val cal = Calendar.getInstance().apply {
                     time = today
@@ -150,12 +164,31 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+
+                // ✅ Top-right: streak + icon (only change in UI)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)
+                    ) {
+                        Text(
+                            text = "🔥 $openStreak day streak",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
 
@@ -399,28 +432,6 @@ fun HomeScreen(
             }
         }
 
-        // Encouragement card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "✨ You're doing great",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Every small step counts. Your mood patterns help you understand what supports you best.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
         // Daily challenge
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -598,3 +609,46 @@ private fun MoodCheckInDialog(
         }
     )
 }
+
+// ----------------- STREAK HELPERS -----------------
+private fun normalizeDay(d: Date): Long {
+    val c = Calendar.getInstance().apply {
+        time = d
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    return c.timeInMillis
+}
+
+private fun updateAppOpenStreak(
+    prefs: android.content.SharedPreferences,
+    today: Date
+): Int {
+    val KEY_LAST_OPEN = "last_open_day"
+    val KEY_OPEN_STREAK = "open_streak"
+
+    val todayDay = normalizeDay(today)
+    val lastOpen = prefs.getLong(KEY_LAST_OPEN, -1L)
+    var streak = prefs.getInt(KEY_OPEN_STREAK, 0)
+
+    if (lastOpen == -1L) {
+        streak = 1
+    } else {
+        val diffDays = ((todayDay - lastOpen) / (24L * 60L * 60L * 1000L)).toInt()
+        streak = when (diffDays) {
+            0 -> streak       // opened already today
+            1 -> streak + 1   // continued streak
+            else -> 1         // missed a day -> reset
+        }
+    }
+
+    prefs.edit()
+        .putLong(KEY_LAST_OPEN, todayDay)
+        .putInt(KEY_OPEN_STREAK, streak)
+        .apply()
+
+    return streak
+}
+// -----------------------------------------------------

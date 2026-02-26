@@ -13,9 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.example.consolicalm.ui.theme.AppTheme
 
 @Composable
-fun ProfileScreen(onBack: () -> Unit) {
+fun ProfileScreen(
+    selectedTheme: AppTheme,
+    onSelectTheme: (AppTheme) -> Unit,
+    onBack: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -48,7 +53,7 @@ fun ProfileScreen(onBack: () -> Unit) {
             )
         }
 
-        // Themes section placeholder
+        // Themes
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(18.dp)
@@ -60,17 +65,41 @@ fun ProfileScreen(onBack: () -> Unit) {
                 Text("Themes", style = MaterialTheme.typography.titleMedium)
 
                 Text(
-                    "Coming soon: choose colors, dark/light mode, and app vibe.",
+                    "Pick a look for the app.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                // Placeholder buttons (no functionality yet)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = { }) { Text("Light") }
-                    OutlinedButton(onClick = { }) { Text("Dark") }
-                    OutlinedButton(onClick = { }) { Text("Pastel") }
+                    ThemeButton(
+                        label = "Default",
+                        selected = selectedTheme == AppTheme.DEFAULT,
+                        onClick = { onSelectTheme(AppTheme.DEFAULT) }
+                    )
+                    ThemeButton(
+                        label = "Sage",
+                        selected = selectedTheme == AppTheme.SAGE,
+                        onClick = { onSelectTheme(AppTheme.SAGE) }
+                    )
+                    ThemeButton(
+                        label = "Mocha",
+                        selected = selectedTheme == AppTheme.MOCHA,
+                        onClick = { onSelectTheme(AppTheme.MOCHA) }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ThemeButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    if (selected) {
+        Button(onClick = onClick) { Text(label) }
+    } else {
+        OutlinedButton(onClick = onClick) { Text(label) }
     }
 }

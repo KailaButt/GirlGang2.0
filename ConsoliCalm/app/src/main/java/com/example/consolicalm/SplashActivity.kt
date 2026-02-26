@@ -4,14 +4,15 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -22,40 +23,50 @@ class SplashActivity : ComponentActivity() {
 
         setContent {
 
-            // Wait then open Login
+            // ---- Navigate to Login after delay ----
             LaunchedEffect(Unit) {
-                delay(2000)
+                delay(2500)
                 startActivity(Intent(this@SplashActivity, LoginActivity::class.java))
                 finish()
             }
 
-            // Programmatic Logo
+            // ---- ConsoliCalm Color Palette ----
+            val cream = Color(0xFFF8F1EB)
+            val sage = Color(0xFFB9CBC4)
+            val slate = Color(0xFF7B969F)
+
+            // ---- Splash Layout ----
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(cream),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
-                    Surface(
-                        modifier = Modifier.size(120.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        shadowElevation = 8.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "CC",
-                                style = MaterialTheme.typography.headlineLarge,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
+                    // Logo Circles
+                    Canvas(modifier = Modifier.size(160.dp)) {
+
+                        // Outer calm circle
+                        drawCircle(
+                            color = sage,
+                            radius = size.minDimension / 2
+                        )
+
+                        // Inner focus circle
+                        drawCircle(
+                            color = slate,
+                            radius = size.minDimension / 2.6f
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
+                    // App Name
                     Text(
                         text = "ConsoliCalm",
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = slate
                     )
                 }
             }
