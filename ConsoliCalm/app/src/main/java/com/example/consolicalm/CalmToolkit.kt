@@ -12,7 +12,11 @@ import org.json.JSONObject
 data class CalmHistoryEntry(
     val timestampMillis: Long,
     val title: String,
-    val minutes: Int
+    val minutes: Int,
+    /** 1–5 rating captured after a Calm session (0 means not rated / legacy entries). */
+    val rating: Int = 0,
+    /** Optional one-line note captured after a Calm session. */
+    val note: String = ""
 )
 
 class CalmToolkitPrefs(context: Context) {
@@ -50,6 +54,8 @@ class CalmToolkitPrefs(context: Context) {
                     .put("ts", e.timestampMillis)
                     .put("title", e.title)
                     .put("min", e.minutes)
+                    .put("rating", e.rating)
+                    .put("note", e.note)
             )
         }
         return arr.toString()
@@ -65,7 +71,9 @@ class CalmToolkitPrefs(context: Context) {
                         CalmHistoryEntry(
                             timestampMillis = obj.optLong("ts", 0L),
                             title = obj.optString("title", ""),
-                            minutes = obj.optInt("min", 0)
+                            minutes = obj.optInt("min", 0),
+                            rating = obj.optInt("rating", 0),
+                            note = obj.optString("note", "")
                         )
                     )
                 }

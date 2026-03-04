@@ -14,6 +14,11 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // ✅ Google Maven (explicit)
+        maven("https://dl.google.com/dl/android/maven2/")
+        maven("https://maven.google.com")
+
+        // ✅ Standard repos
         google()
         mavenCentral()
     }

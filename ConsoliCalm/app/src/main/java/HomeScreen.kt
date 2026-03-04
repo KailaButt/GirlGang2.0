@@ -23,11 +23,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.google.firebase.firestore.FirebaseFirestore
+
 
 data class MoodEntry(
     val date: Date,
@@ -54,6 +57,40 @@ fun HomeScreen(
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
     }.time
+
+    // -------- Firebase user email (for greeting) --------
+
+    val currentUserEmail = FirebaseAuth.getInstance().currentUser?.email ?: "Not logged in"
+    val user = FirebaseAuth.getInstance().currentUser
+    val db = FirebaseFirestore.getInstance()
+
+    user?.let {
+
+        val userRef = db.collection("public_users").document(it.uid)
+
+        userRef.get().addOnSuccessListener { doc ->
+
+            if (!doc.exists()) {
+
+                val friendCode = it.uid.take(6).uppercase()
+
+                val newUser = hashMapOf(
+                    "uid" to it.uid,
+                    "nickname" to "",
+                    "friendCode" to friendCode
+                )
+
+                userRef.set(newUser)
+            }
+        }
+    }
+
+    val userContext = LocalContext.current
+    val userPrefs = UserPrefs(userContext)
+
+    val nickname = userPrefs.nickname
+    val displayName = nickname ?: currentUserEmail
+    // ----------------------------------------------------
 
     // ----------------- 🔥 APP OPEN STREAK -----------------
     val context = LocalContext.current
@@ -139,6 +176,35 @@ fun HomeScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // -------- Greeting Header (top left) --------
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Hello,",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = displayName ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            IconButton(onClick = onProfileClick) {
+                Icon(
+                    imageVector = Icons.Filled.Person,
+                    contentDescription = "Profile"
+                )
+            }
+        }
+        // -------------------------------------------
+
         // Header with Calm Points
         Card(
             modifier = Modifier.fillMaxWidth(),

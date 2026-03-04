@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "338376344767",
+    "project_id": "consolicalm",
+    "storage_bucket": "consolicalm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:338376344767:android:15225325b91fd46246320a",
+        "android_client_info": {
+          "package_name": "com.example.consolicalm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD3W7Ms2nZW6icwz8TWkEnP3JwdYBqUifk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

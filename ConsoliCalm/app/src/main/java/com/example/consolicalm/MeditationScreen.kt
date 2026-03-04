@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +57,17 @@ fun MeditationScreen(
     var favorites by remember { mutableStateOf(setOf<String>()) }
     var history by remember { mutableStateOf(listOf<CalmHistoryEntry>()) }
     var showHistory by remember { mutableStateOf(false) }
+
+    // Quick Calm (super short breathing reset)
+    var showQuickCalm by remember { mutableStateOf(false) }
+
+    // Session rating flow (1–5 + optional note)
+    var showRatingPrompt by remember { mutableStateOf(false) }
+    var pendingTitle by remember { mutableStateOf("") }
+    var pendingMinutes by remember { mutableIntStateOf(0) }
+    var pendingEarnedPoints by remember { mutableIntStateOf(0) }
+    var pendingIsChallenge by remember { mutableStateOf(false) }
+    var pendingCloseSessionPlayer by remember { mutableStateOf(false) }
 
     // Session player state
     var activeSession by remember { mutableStateOf<CalmSession?>(null) }
@@ -150,6 +162,21 @@ fun MeditationScreen(
         favorites = toolkitPrefs.getFavorites()
     }
 
+    fun beginRatingFlow(
+        title: String,
+        minutes: Int,
+        earnedPoints: Int,
+        isChallenge: Boolean,
+        closeSessionPlayerAfterSave: Boolean
+    ) {
+        pendingTitle = title
+        pendingMinutes = minutes
+        pendingEarnedPoints = earnedPoints
+        pendingIsChallenge = isChallenge
+        pendingCloseSessionPlayer = closeSessionPlayerAfterSave
+        showRatingPrompt = true
+    }
+
     val favoriteSessions = remember(favorites, sessions) {
         sessions.filter { favorites.contains(sessionKey(it)) }
     }
@@ -185,6 +212,31 @@ fun MeditationScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("Take a small pause 🌿", fontWeight = FontWeight.Bold)
                     Text("Pick something short. Even one minute counts.")
+                }
+            }
+
+            // --- Quick Calm (60–90 second reset) ---
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Quick Calm", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text("60–90 second breathing reset (inhale 4, exhale 6)")
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Button(onClick = { showQuickCalm = true }) {
+                        Text("Start")
+                    }
                 }
             }
 
@@ -447,23 +499,116 @@ fun MeditationScreen(
                 refreshProgress()
             },
             onCompleted = { earnedPoints ->
-                prefs.recordSessionCompleted()
-                if (activeIsChallenge) {
-                    prefs.challengeCompletedKey = todayKey
-                }
-
-                // history log (date + session + minutes)
+                // Defer history write until the user rates the session.
                 val minutes = ((session.estimatedSeconds + 59) / 60).coerceAtLeast(1)
-                toolkitPrefs.addHistoryEntry(
-                    CalmHistoryEntry(
-                        timestampMillis = System.currentTimeMillis(),
-                        title = session.title,
-                        minutes = minutes
-                    )
+                beginRatingFlow(
+                    title = session.title,
+                    minutes = minutes,
+                    earnedPoints = earnedPoints,
+                    isChallenge = activeIsChallenge,
+                    closeSessionPlayerAfterSave = true
                 )
+            }
+        )
+    }
 
-                refreshProgress()
-                onEarnPoints(earnedPoints)
+    // Quick Calm full-screen timer
+    if (showQuickCalm) {
+        QuickCalmPlayer(
+            onClose = { showQuickCalm = false },
+            onCompleted = {
+                beginRatingFlow(
+                    title = "Quick Calm (Extended Exhale 4–6)",
+                    minutes = 1,
+                    earnedPoints = 0,
+                    isChallenge = false,
+                    closeSessionPlayerAfterSave = false
+                )
+            }
+        )
+    }
+
+    // Session rating prompt (1–5 + optional note) shown after any completed Calm session.
+    if (showRatingPrompt) {
+        var rating by remember(pendingTitle) { mutableIntStateOf(3) }
+        var note by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { /* Require an explicit save to ensure rating is captured. */ },
+            title = { Text("How did that feel?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (i in 1..5) {
+                            val selected = i <= rating
+                            IconButton(onClick = { rating = i }) {
+                                Icon(
+                                    imageVector = if (selected) Icons.Filled.Star else Icons.Outlined.Star,
+                                    contentDescription = "$i stars",
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+
+                    Text("Rating: $rating/5", style = MaterialTheme.typography.bodySmall)
+
+                    OutlinedTextField(
+                        value = note,
+                        onValueChange = { note = it.take(120) },
+                        label = { Text("Optional note") },
+                        placeholder = { Text("One sentence…") },
+                        singleLine = true,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Persist session completion + rating
+                        prefs.recordSessionCompleted()
+                        if (pendingIsChallenge) {
+                            prefs.challengeCompletedKey = todayKey
+                        }
+
+                        toolkitPrefs.addHistoryEntry(
+                            CalmHistoryEntry(
+                                timestampMillis = System.currentTimeMillis(),
+                                title = pendingTitle,
+                                minutes = pendingMinutes,
+                                rating = rating.coerceIn(1, 5),
+                                note = note.trim()
+                            )
+                        )
+
+                        // Award points (Quick Calm uses 0 by design)
+                        onEarnPoints(pendingEarnedPoints)
+                        refreshProgress()
+
+                        // Close whichever player launched the rating prompt
+                        if (pendingCloseSessionPlayer) {
+                            activeSession = null
+                            activeIsChallenge = false
+                        } else {
+                            showQuickCalm = false
+                        }
+
+                        showRatingPrompt = false
+                        pendingTitle = ""
+                        pendingMinutes = 0
+                        pendingEarnedPoints = 0
+                        pendingIsChallenge = false
+                        pendingCloseSessionPlayer = false
+                    }
+                ) {
+                    Text("Save")
+                }
             }
         )
     }
@@ -569,7 +714,26 @@ private fun HistoryRow(entry: CalmHistoryEntry) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(2.dp))
-                Text(dateStr)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(dateStr)
+                    if (entry.rating in 1..5) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            for (i in 1..5) {
+                                val selected = i <= entry.rating
+                                Icon(
+                                    imageVector = if (selected) Icons.Filled.Star else Icons.Outlined.Star,
+                                    contentDescription = null,
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (entry.note.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(entry.note, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
             AssistChip(
                 onClick = { },
