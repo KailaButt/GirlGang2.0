@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
@@ -60,6 +61,9 @@ fun MeditationScreen(
 
     // Quick Calm (super short breathing reset)
     var showQuickCalm by remember { mutableStateOf(false) }
+
+    // Top-level Calm tab filter (shows/hides sections; does not change any completed features)
+    var calmFilter by remember { mutableStateOf(CalmTabFilter.ALL) }
 
     // Session rating flow (1–5 + optional note)
     var showRatingPrompt by remember { mutableStateOf(false) }
@@ -205,7 +209,53 @@ fun MeditationScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Card(
+
+            // --- Calm tab filters (All / Guided Calm Sessions / Quick Breathing / Short Meditations / Longer Sessions) ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                fun isSelected(f: CalmTabFilter) = calmFilter == f
+
+                @Composable
+                fun chipColors(selected: Boolean) = AssistChipDefaults.assistChipColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    else MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                AssistChip(
+                    onClick = { calmFilter = CalmTabFilter.ALL },
+                    label = { Text("All") },
+                    colors = chipColors(isSelected(CalmTabFilter.ALL))
+                )
+                AssistChip(
+                    onClick = { calmFilter = CalmTabFilter.GUIDED_SESSIONS },
+                    label = { Text("Guided Calm Sessions") },
+                    colors = chipColors(isSelected(CalmTabFilter.GUIDED_SESSIONS))
+                )
+                AssistChip(
+                    onClick = { calmFilter = CalmTabFilter.QUICK_BREATHING },
+                    label = { Text("Quick Breathing") },
+                    colors = chipColors(isSelected(CalmTabFilter.QUICK_BREATHING))
+                )
+                AssistChip(
+                    onClick = { calmFilter = CalmTabFilter.SHORT_MEDITATIONS },
+                    label = { Text("Short Meditations") },
+                    colors = chipColors(isSelected(CalmTabFilter.SHORT_MEDITATIONS))
+                )
+                AssistChip(
+                    onClick = { calmFilter = CalmTabFilter.LONGER_SESSIONS },
+                    label = { Text("Longer Sessions") },
+                    colors = chipColors(isSelected(CalmTabFilter.LONGER_SESSIONS))
+                )
+            }
+
+                        if (calmFilter == CalmTabFilter.ALL) {
+Card(
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -214,37 +264,42 @@ fun MeditationScreen(
                     Text("Pick something short. Even one minute counts.")
                 }
             }
+            }
+
 
             // --- Quick Calm (60–90 second reset) ---
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+            if (calmFilter == CalmTabFilter.ALL) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Quick Calm", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        Text("60–90 second breathing reset (inhale 4, exhale 6)")
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Button(onClick = { showQuickCalm = true }) {
-                        Text("Start")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Quick Calm", fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text("60–90 second breathing reset (inhale 4, exhale 6)")
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Button(onClick = { showQuickCalm = true }) {
+                            Text("Start")
+                        }
                     }
                 }
             }
 
             // --- Progress / streak / daily goal ---
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
+            if (calmFilter == CalmTabFilter.ALL) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -283,11 +338,14 @@ fun MeditationScreen(
                 }
             }
 
+            }
+
             // --- Daily Calm Challenge ---
-            Card(
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
+            if (calmFilter == CalmTabFilter.ALL) {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -329,14 +387,20 @@ fun MeditationScreen(
                 }
             }
 
+            }
+
             // --- My Toolkit (favorites) ---
-            SectionTitle("My Toolkit")
-            if (favoriteSessions.isEmpty() && favoriteResources.isEmpty()) {
-                Text("Star a session or resource to save it here.")
-            } else {
-                if (favoriteSessions.isNotEmpty()) {
-                    Text("Saved sessions", fontWeight = FontWeight.SemiBold)
-                    favoriteSessions.forEach { s ->
+            if (calmFilter == CalmTabFilter.ALL) {
+                SectionTitle("My Toolkit")
+                val showSavedSessions = (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.GUIDED_SESSIONS)
+                val showSavedResources = (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.ALL)
+
+                if ((showSavedSessions && favoriteSessions.isEmpty()) && (showSavedResources && favoriteResources.isEmpty())) {
+                    Text("Star a session or resource to save it here.")
+                } else {
+                    if (showSavedSessions && favoriteSessions.isNotEmpty()) {
+                        Text("Saved sessions", fontWeight = FontWeight.SemiBold)
+                        favoriteSessions.forEach { s ->
                         Card(
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -370,23 +434,25 @@ fun MeditationScreen(
                                 ) { Text("Start") }
                             }
                         }
+                        }
                     }
-                }
 
-                if (favoriteResources.isNotEmpty()) {
-                    Text("Saved resources", fontWeight = FontWeight.SemiBold)
-                    favoriteResources.forEach { res ->
+                    if (showSavedResources && favoriteResources.isNotEmpty()) {
+                        Text("Saved resources", fontWeight = FontWeight.SemiBold)
+                        favoriteResources.forEach { res ->
                         ResourceCard(
                             resource = res,
                             isFavorite = true,
                             onToggleFavorite = { toggleFavorite(resourceKey(res)) },
                             onOpen = { openUrl(res.url) }
                         )
+                        }
                     }
                 }
             }
 
-            // --- Calm history ---
+                        if (calmFilter == CalmTabFilter.ALL) {
+// --- Calm history ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -405,10 +471,14 @@ fun MeditationScreen(
                 }
             }
 
-            // --- Guided Calm Sessions (interactive) ---
-            SectionTitle("Guided Calm sessions")
-            Text("Tap Start to follow step-by-step with a timer.")
-            sessions.forEach { s ->
+            
+            }
+
+// --- Guided Calm Sessions (interactive) ---
+            if (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.GUIDED_SESSIONS) {
+                SectionTitle("Guided Calm sessions")
+                Text("Tap Start to follow step-by-step with a timer.")
+                sessions.forEach { s ->
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -454,37 +524,50 @@ fun MeditationScreen(
                         }
                     }
                 }
+                }
             }
 
-            SectionTitle("Quick breathing")
-            breathing.forEach { res ->
+                        if (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.QUICK_BREATHING) {
+SectionTitle("Quick breathing")
+                breathing.forEach { res ->
                 ResourceCard(
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
                     onOpen = { openUrl(res.url) }
                 )
+                }
+
+                
             }
 
-            SectionTitle("Short meditations")
-            shortMeditations.forEach { res ->
+            if (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.SHORT_MEDITATIONS) {
+SectionTitle("Short meditations")
+                shortMeditations.forEach { res ->
                 ResourceCard(
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
                     onOpen = { openUrl(res.url) }
                 )
+                }
+
+                
             }
 
-            SectionTitle("Longer sessions")
-            longerSessions.forEach { res ->
+            if (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.LONGER_SESSIONS) {
+SectionTitle("Longer sessions")
+                longerSessions.forEach { res ->
                 ResourceCard(
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
                     onOpen = { openUrl(res.url) }
                 )
+                }
+            
             }
+
         }
     }
 
@@ -614,6 +697,9 @@ fun MeditationScreen(
     }
 
     if (showHistory) {
+        // History filter only affects the dialog list; does not change any other Calm UI.
+        var historyFilter by remember(showHistory) { mutableStateOf(CalmHistoryFilter.ALL) }
+
         AlertDialog(
             onDismissRequest = { showHistory = false },
             confirmButton = {
@@ -624,14 +710,67 @@ fun MeditationScreen(
                 if (history.isEmpty()) {
                     Text("No sessions completed yet.")
                 } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 420.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(history) { entry ->
-                            HistoryRow(entry = entry)
+                    val filteredHistory = remember(history, historyFilter) {
+                        when (historyFilter) {
+                            CalmHistoryFilter.ALL -> history
+                            CalmHistoryFilter.QUICK_CALM -> history.filter { it.title.startsWith("Quick Calm") }
+                            CalmHistoryFilter.GUIDED -> history.filterNot { it.title.startsWith("Quick Calm") }
+                        }
+                    }
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Small filter row above the list: All / Quick Calm / Guided
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            fun isSelected(f: CalmHistoryFilter) = historyFilter == f
+                            @Composable
+                            fun chipColors(selected: Boolean) = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                else MaterialTheme.colorScheme.surfaceVariant,
+                                labelColor = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            AssistChip(
+                                onClick = { historyFilter = CalmHistoryFilter.ALL },
+                                label = { Text("All") },
+                                colors = chipColors(isSelected(CalmHistoryFilter.ALL))
+                            )
+                            AssistChip(
+                                onClick = { historyFilter = CalmHistoryFilter.QUICK_CALM },
+                                label = { Text("Quick Calm") },
+                                colors = chipColors(isSelected(CalmHistoryFilter.QUICK_CALM))
+                            )
+                            AssistChip(
+                                onClick = { historyFilter = CalmHistoryFilter.GUIDED },
+                                label = { Text("Guided") },
+                                colors = chipColors(isSelected(CalmHistoryFilter.GUIDED))
+                            )
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        if (filteredHistory.isEmpty()) {
+                            Text(
+                                when (historyFilter) {
+                                    CalmHistoryFilter.ALL -> "No sessions completed yet."
+                                    CalmHistoryFilter.QUICK_CALM -> "No Quick Calm sessions yet."
+                                    CalmHistoryFilter.GUIDED -> "No Guided sessions yet."
+                                }
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 420.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredHistory) { entry ->
+                                    HistoryRow(entry = entry)
+                                }
+                            }
                         }
                     }
                 }
@@ -639,6 +778,10 @@ fun MeditationScreen(
         )
     }
 }
+
+private enum class CalmHistoryFilter { ALL, QUICK_CALM, GUIDED }
+
+private enum class CalmTabFilter { ALL, GUIDED_SESSIONS, QUICK_BREATHING, SHORT_MEDITATIONS, LONGER_SESSIONS }
 
 @Composable
 private fun SectionTitle(text: String) {

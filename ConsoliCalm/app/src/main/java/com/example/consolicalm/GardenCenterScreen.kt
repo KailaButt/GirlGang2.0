@@ -5,7 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,7 +26,6 @@ fun GardenCenterScreen(
             .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // ✅ Top row with Back + Points
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -48,7 +47,10 @@ fun GardenCenterScreen(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text("Currently growing", style = MaterialTheme.typography.titleMedium)
                 Text("${selected.title} • Stage ${GardenCenterStore.stageFor(selected)} / 4")
                 Text(selected.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -56,18 +58,23 @@ fun GardenCenterScreen(
         }
 
         Text("Plants", style = MaterialTheme.typography.titleMedium)
-        Text("Right side shows the fully-grown + fully-upgraded look.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Right side shows the fully-grown + fully-upgraded look.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         PlantShopCard(PlantType.JUNIPER_BONSAI, cost = 0)
         PlantShopCard(PlantType.REGULAR_TREE, cost = 120)
         PlantShopCard(PlantType.FLOWER, cost = 90)
         PlantShopCard(PlantType.CACTUS, cost = 110)
-        PlantShopCard(PlantType.CHERRY_BLOSSOM, cost = 180)
 
         Spacer(Modifier.height(6.dp))
 
         Text("Upgrades", style = MaterialTheme.typography.titleMedium)
-        Text("Upgrades apply to the selected plant.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Upgrades apply to the selected plant.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         val selectedPlantData = owned[selected]
         if (selectedPlantData == null) {
@@ -93,8 +100,11 @@ private fun PlantShopCard(type: PlantType, cost: Int) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (selected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
         Row(
@@ -104,7 +114,10 @@ private fun PlantShopCard(type: PlantType, cost: Int) {
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,9 +136,14 @@ private fun PlantShopCard(type: PlantType, cost: Int) {
                 ) {
                     if (!owned) {
                         Text("Cost: ⭐ $cost", style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { GardenCenterStore.buyPlant(type, cost) }) { Text("Buy") }
+                        Button(onClick = { GardenCenterStore.buyPlant(type, cost) }) {
+                            Text("Buy")
+                        }
                     } else {
-                        Text(if (selected) "Selected" else "Owned", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (selected) "Selected" else "Owned",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         OutlinedButton(onClick = { GardenCenterStore.select(type) }) {
                             Text(if (selected) "Selected" else "Select")
                         }
@@ -162,7 +180,10 @@ private fun UpgradeCard(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(
+            Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,7 +201,10 @@ private fun UpgradeCard(
                 "bonus_points" -> "Owned: ${current.upgradeBonusPoints}"
                 else -> ""
             }
-            if (extra.isNotBlank()) Text(extra, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            if (extra.isNotBlank()) {
+                Text(extra, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
 
             Button(
                 onClick = { GardenCenterStore.buyUpgrade(plantType, upgrade) },
@@ -191,4 +215,3 @@ private fun UpgradeCard(
         }
     }
 }
-

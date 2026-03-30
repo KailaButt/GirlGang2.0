@@ -19,3 +19,10 @@ val OnSurfaceLight = Color(0xFF1C1B1F)
 val BackgroundDark = Color(0xFF121212)
 val SurfaceDark = Color(0xFF1E1E1E)
 val OnSurfaceDark = Color(0xFFE6E1E5)
+
+// ✅ ConsoliCalm Palette
+val CalmBackground  = Color(0xFFEDF4F0)   // mint white
+val CalmSurface     = Color(0xFFF5EFE8)   // warm cream
+val CalmPrimary     = Color(0xFF7B969F)   // slate blue
+val CalmSecondary   = Color(0xFFAAC4C2)   // muted teal
+val CalmAccent      = Color(0xFFBDD4DC)   // powder blue

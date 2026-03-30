@@ -52,6 +52,7 @@ fun LoginOrSignUpScreen(onAuthSuccess: () -> Unit) {
     var isSignUpMode by remember { mutableStateOf(false) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var infoMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
 
     Column(
@@ -99,9 +100,19 @@ fun LoginOrSignUpScreen(onAuthSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
         }
 
+        // Success / info message
+        if (infoMessage != null) {
+            Text(
+                text = infoMessage!!,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         Button(
             onClick = {
                 errorMessage = null
+                infoMessage = null
                 val trimmedEmail = email.trim()
 
                 // ✅ Block empty
@@ -140,6 +151,38 @@ fun LoginOrSignUpScreen(onAuthSuccess: () -> Unit) {
                     else -> "Login"
                 }
             )
+        }
+
+        // Reset password (login mode only)
+        if (!isSignUpMode) {
+            Spacer(modifier = Modifier.height(6.dp))
+
+            TextButton(
+                onClick = {
+                    errorMessage = null
+                    infoMessage = null
+
+                    val trimmedEmail = email.trim()
+                    if (trimmedEmail.isBlank()) {
+                        errorMessage = "Enter your email above to reset your password."
+                        return@TextButton
+                    }
+
+                    isLoading = true
+                    auth.sendPasswordResetEmail(trimmedEmail)
+                        .addOnCompleteListener { task ->
+                            isLoading = false
+                            if (task.isSuccessful) {
+                                infoMessage = "Password reset email sent. Check your inbox."
+                            } else {
+                                errorMessage = task.exception?.localizedMessage
+                                    ?: "Could not send reset email. Try again."
+                            }
+                        }
+                }
+            ) {
+                Text("Forgot password?")
+            }
         }
 
         Spacer(modifier = Modifier.height(10.dp))

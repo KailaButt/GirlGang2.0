@@ -1,13 +1,19 @@
-package com.example.consolicalm.com.example.consolicalm.ui.theme
-
-
+package com.example.consolicalm.ui.theme
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.consolicalm.R
+
+val PacificoFont = FontFamily(
+    Font(R.font.pacifico_regular)
+)
 
 @Composable
 fun HomeScreen(
@@ -21,6 +27,10 @@ fun HomeScreen(
     onEarnPoints: (Int) -> Unit
 ) {
 
+    val progress = if (nextRewardGoal > 0)
+        calmPoints.toFloat() / nextRewardGoal.toFloat()
+    else 0f
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -31,7 +41,9 @@ fun HomeScreen(
 
         Text(
             text = "ConsoliCalm",
-            style = MaterialTheme.typography.headlineMedium
+            fontFamily = PacificoFont,
+            fontSize = 28.sp,
+            letterSpacing = 1.sp
         )
 
         Card(
@@ -39,7 +51,13 @@ fun HomeScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
 
-                Text("Calm Points", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Calm Points",
+                    fontFamily = PacificoFont,
+                    fontSize = 20.sp,
+                    letterSpacing = 0.5.sp
+                )
+
                 Text(
                     text = "$calmPoints pts",
                     style = MaterialTheme.typography.headlineSmall
@@ -48,7 +66,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 LinearProgressIndicator(
-                    progress = calmPoints.toFloat() / nextRewardGoal.toFloat(),
+                    progress = { progress },
                     modifier = Modifier.fillMaxWidth()
                 )
 

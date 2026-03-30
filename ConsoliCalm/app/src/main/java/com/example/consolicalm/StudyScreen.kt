@@ -3,9 +3,18 @@ package com.example.consolicalm
 import android.app.Activity
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -13,6 +22,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -106,14 +121,35 @@ private fun ModeSelectionScreen(
 
         Text("Choose a Study Mode", style = MaterialTheme.typography.headlineSmall)
 
-        // ✅ Coach card (with recommended mode start)
         ProcrastinationCoachCard(
             onRecommendedMode = { recommended -> onSelect(recommended) }
         )
 
-        ModeCard(mode = StudyMode.POMODORO_25_5, onClick = { onSelect(StudyMode.POMODORO_25_5) })
-        ModeCard(mode = StudyMode.DEEPWORK_60_10, onClick = { onSelect(StudyMode.DEEPWORK_60_10) })
-        ModeCard(mode = StudyMode.QUICKSTART_5_1, onClick = { onSelect(StudyMode.QUICKSTART_5_1) })
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            ModeCircle(
+                mode = StudyMode.POMODORO_25_5,
+                onClick = { onSelect(StudyMode.POMODORO_25_5) }
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ModeCircle(
+                    mode = StudyMode.DEEPWORK_60_10,
+                    onClick = { onSelect(StudyMode.DEEPWORK_60_10) }
+                )
+
+                ModeCircle(
+                    mode = StudyMode.QUICKSTART_5_1,
+                    onClick = { onSelect(StudyMode.QUICKSTART_5_1) }
+                )
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -143,22 +179,34 @@ private fun ModeSelectionScreen(
 }
 
 @Composable
-private fun ModeCard(mode: StudyMode, onClick: () -> Unit) {
+private fun ModeCircle(mode: StudyMode, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        onClick = onClick
+        modifier = Modifier.size(150.dp),
+        shape = CircleShape,
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(mode.title, style = MaterialTheme.typography.titleMedium)
-                AssistChip(onClick = onClick, label = { Text("${mode.focusMinutes}m") })
-            }
-            Text(mode.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "${mode.focusMinutes}m",
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = mode.title.split(" ").take(2).joinToString(" "),
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -279,12 +327,33 @@ private fun FocusTimerScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        StudyBackground(isBreak = isBreak, isRunningFocus = isRunning && !isBreak)
+        if (isRunning) {
+            MeadowStudyBackground(
+                progress = progress,
+                isBreak = isBreak
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.background,
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                            )
+                        )
+                    )
+            )
+        }
 
         Scaffold(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+            containerColor = Color.Transparent,
             topBar = {
-                Surface(tonalElevation = 2.dp) {
+                Surface(
+                    tonalElevation = 2.dp,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                ) {
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -305,7 +374,10 @@ private fun FocusTimerScreen(
                 }
             },
             bottomBar = {
-                Surface(tonalElevation = 6.dp) {
+                Surface(
+                    tonalElevation = 6.dp,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                ) {
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -334,7 +406,9 @@ private fun FocusTimerScreen(
                                     timeLeft = mode.focusMinutes * 60
                                     focusSessionsThisRun = 0
                                 }
-                            ) { Text("Restart") }
+                            ) {
+                                Text("Restart")
+                            }
                         }
 
                         Row(
@@ -361,19 +435,17 @@ private fun FocusTimerScreen(
             ) {
                 Spacer(Modifier.height(14.dp))
 
-                // ✅ Coach card also on timer screen (for mid-session stuck moments)
-                ProcrastinationCoachCard(
-                    title = "Stuck right now?",
-                    onRecommendedMode = null, // already in a mode
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
-
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
+                    )
                 ) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -451,7 +523,9 @@ private fun FocusTimerScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
+                    )
                 ) {
                     Row(
                         Modifier.padding(14.dp),
@@ -464,7 +538,10 @@ private fun FocusTimerScreen(
                             modifier = Modifier.size(110.dp)
                         )
                         Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Column(
+                            Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Text("Currently growing", style = MaterialTheme.typography.titleMedium)
                             Text("${plant.title} • Stage $stage / 4", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
@@ -480,9 +557,14 @@ private fun FocusTimerScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f)
+                    )
                 ) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(
+                        Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Text("Run stats", style = MaterialTheme.typography.titleMedium)
                         Text("✅ Focus sessions completed (this run): $focusSessionsThisRun")
                         Text("🌱 Selected plant: ${plant.title}")
@@ -497,13 +579,178 @@ private fun FocusTimerScreen(
     }
 }
 
+@Composable
+private fun MeadowStudyBackground(
+    progress: Float,
+    isBreak: Boolean
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "sky_meadow")
+
+    val cloudShift1 by infiniteTransition.animateFloat(
+        initialValue = -250f,
+        targetValue = 1400f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (isBreak) 38000 else 26000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "cloud1"
+    )
+
+    val cloudShift2 by infiniteTransition.animateFloat(
+        initialValue = 1300f,
+        targetValue = -350f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = if (isBreak) 48000 else 34000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "cloud2"
+    )
+
+    val clampedProgress = progress.coerceIn(0f, 1f)
+
+    val skyTop = if (isBreak) {
+        lerpColor(Color(0xFF2C3E70), Color(0xFF111827), clampedProgress)
+    } else {
+        lerpColor(Color(0xFF8EDBFF), Color(0xFFFF9E80), clampedProgress)
+    }
+
+    val skyMid = if (isBreak) {
+        lerpColor(Color(0xFF5B6FAF), Color(0xFF312E81), clampedProgress)
+    } else {
+        lerpColor(Color(0xFFBEEBFF), Color(0xFFFFC58F), clampedProgress)
+    }
+
+    val skyBottom = if (isBreak) {
+        lerpColor(Color(0xFF8FA0D8), Color(0xFF4C1D95), clampedProgress)
+    } else {
+        lerpColor(Color(0xFFEAFBFF), Color(0xFFFFD7B8), clampedProgress)
+    }
+
+    val grassColor = if (isBreak) {
+        lerpColor(Color(0xFF355C43), Color(0xFF1B3527), clampedProgress)
+    } else {
+        lerpColor(Color(0xFF6FCF97), Color(0xFF2F855A), clampedProgress)
+    }
+
+    val grassHighlight = if (isBreak) {
+        Color.White.copy(alpha = 0.03f)
+    } else {
+        Color.White.copy(alpha = 0.08f)
+    }
+
+    val sunColor = if (isBreak) Color(0xFFFFE7B0) else Color(0xFFFFD54F)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(skyTop, skyMid, skyBottom)
+                )
+            )
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+
+            val sunStartX = w * 0.78f
+            val sunEndX = w * 0.58f
+            val sunStartY = h * 0.18f
+            val sunEndY = h * 0.58f
+
+            val sunX = sunStartX + (sunEndX - sunStartX) * clampedProgress
+            val sunY = sunStartY + (sunEndY - sunStartY) * clampedProgress
+            val sunRadius = if (isBreak) 38f else 50f
+
+            drawCircle(
+                color = sunColor,
+                radius = sunRadius,
+                center = Offset(sunX, sunY)
+            )
+
+            drawCloud(
+                x = cloudShift1,
+                y = h * 0.18f,
+                scale = 1.05f,
+                color = if (isBreak) Color.White.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.78f)
+            )
+
+            drawCloud(
+                x = cloudShift2,
+                y = h * 0.28f,
+                scale = 0.85f,
+                color = if (isBreak) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.68f)
+            )
+
+            val grassPath = Path().apply {
+                val baseY = h * 0.77f
+
+                moveTo(0f, h)
+                lineTo(0f, baseY)
+
+                quadraticBezierTo(
+                    w * 0.25f, baseY - 18f,
+                    w * 0.50f, baseY + 2f
+                )
+                quadraticBezierTo(
+                    w * 0.75f, baseY + 18f,
+                    w, baseY - 8f
+                )
+
+                lineTo(w, h)
+                close()
+            }
+
+            drawPath(
+                path = grassPath,
+                color = grassColor
+            )
+
+            drawRoundRect(
+                color = grassHighlight,
+                topLeft = Offset(0f, h * 0.76f),
+                size = Size(w, 12f),
+                cornerRadius = CornerRadius(18f, 18f)
+            )
+        }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCloud(
+    x: Float,
+    y: Float,
+    scale: Float,
+    color: Color
+) {
+    drawCircle(color = color, radius = 28f * scale, center = Offset(x + 35f * scale, y + 18f * scale))
+    drawCircle(color = color, radius = 40f * scale, center = Offset(x + 75f * scale, y))
+    drawCircle(color = color, radius = 32f * scale, center = Offset(x + 118f * scale, y + 18f * scale))
+    drawRoundRect(
+        color = color,
+        topLeft = Offset(x + 24f * scale, y + 18f * scale),
+        size = Size(116f * scale, 34f * scale),
+        cornerRadius = CornerRadius(30f, 30f)
+    )
+}
+
+private fun lerpColor(start: Color, end: Color, fraction: Float): Color {
+    val t = fraction.coerceIn(0f, 1f)
+    return Color(
+        red = start.red + (end.red - start.red) * t,
+        green = start.green + (end.green - start.green) * t,
+        blue = start.blue + (end.blue - start.blue) * t,
+        alpha = start.alpha + (end.alpha - start.alpha) * t
+    )
+}
+
 private fun formatTime(seconds: Int): String {
     val mins = seconds / 60
     val secs = seconds % 60
     return "%02d:%02d".format(mins, secs)
 }
-
-
-
-
-

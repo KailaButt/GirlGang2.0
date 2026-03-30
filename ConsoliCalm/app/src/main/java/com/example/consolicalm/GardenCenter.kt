@@ -7,7 +7,6 @@ enum class PlantType(val title: String, val description: String) {
     REGULAR_TREE("Mountain Pine", "A hardy pine that looks best in the snow."),
     FLOWER("Flower", "Bright and rewarding. Blooms fast."),
     CACTUS("Cactus", "Low maintenance. Tough and simple."),
-    CHERRY_BLOSSOM("Cherry Blossom", "Elegant. Unlock blossoms as you level it.")
 }
 
 data class PlantUpgrade(

@@ -1,31 +1,66 @@
 package com.example.consolicalm
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import java.util.Locale
 import java.util.UUID
 
@@ -36,9 +71,9 @@ data class TodoItem(
 )
 
 private enum class PriorityType(val label: String, val emoji: String, val rank: Int) {
-    URGENT("urgent", "\uD83D\uDEA8", 3),
+    URGENT("urgent", "🚨", 3),
     FOCUS("focus", "🧠", 2),
-    LOW("nice to get to", "\uD83E\uDEB4", 1),
+    LOW("nice to get to", "🌿", 1),
     NORMAL("normal", "✨", 0)
 }
 
@@ -59,17 +94,15 @@ private fun detectPriority(text: String): PriorityType {
 }
 
 private fun priorityBorder(priority: PriorityType): BorderStroke? {
-    // soft “glow” look using semi-transparent borders
     return when (priority) {
-        PriorityType.URGENT -> BorderStroke(2.dp, Color(0x66D32F2F))   // red glow
-        PriorityType.FOCUS -> BorderStroke(2.dp, Color(0x664169E1))    // blue glow
-        PriorityType.LOW -> BorderStroke(2.dp, Color(0x66D6C3B5))      // beige glow
+        PriorityType.URGENT -> BorderStroke(2.dp, Color(0x66D32F2F))
+        PriorityType.FOCUS -> BorderStroke(2.dp, Color(0x664169E1))
+        PriorityType.LOW -> BorderStroke(2.dp, Color(0x66D6C3B5))
         PriorityType.NORMAL -> null
     }
 }
 
 private fun priorityChipColors(priority: PriorityType): Pair<Color, Color> {
-    // background, text (no MaterialTheme usage here, so no @Composable needed)
     return when (priority) {
         PriorityType.URGENT -> Color(0x1AD32F2F) to Color(0xFFB71C1C)
         PriorityType.FOCUS -> Color(0x1A4169E1) to Color(0xFF2F55C7)
@@ -78,6 +111,25 @@ private fun priorityChipColors(priority: PriorityType): Pair<Color, Color> {
     }
 }
 
+private fun priorityContainerColor(priority: PriorityType): Color {
+    return when (priority) {
+        PriorityType.URGENT -> Color(0xFFFFF1EE)
+        PriorityType.FOCUS -> Color(0xFFF1F5FF)
+        PriorityType.LOW -> Color(0xFFF2F6F2)
+        PriorityType.NORMAL -> Color(0xFFF7F4EF)
+    }
+}
+
+private fun taskSupportText(priority: PriorityType, isDone: Boolean): String {
+    if (isDone) return "Completed ✓"
+
+    return when (priority) {
+        PriorityType.URGENT -> "Time-sensitive — good to do first"
+        PriorityType.FOCUS -> "Focused work — best with calm attention"
+        PriorityType.LOW -> "Low-pressure task — nice for lower energy"
+        PriorityType.NORMAL -> "A small steady step still counts"
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,9 +146,9 @@ fun TodoScreen(
 
     val remaining = items.count { !it.isDone }
     val completed = items.count { it.isDone }
+    val total = items.size
+    val progress = if (total == 0) 0f else completed.toFloat() / total.toFloat()
 
-    // ✅ IMPORTANT: this fixes “I have to leave and come back”
-    // derivedStateOf recalculates whenever items changes.
     val sortedItems by remember(items) {
         derivedStateOf {
             items.sortedWith(
@@ -107,10 +159,26 @@ fun TodoScreen(
         }
     }
 
+    val activeItems = sortedItems.filter { !it.isDone }
+    val completedItems = sortedItems.filter { it.isDone }
+
+    val topFocusItem = activeItems.firstOrNull()
+    val otherActiveItems = activeItems.drop(1)
+
+    val focusFirstItems = otherActiveItems.filter {
+        val p = detectPriority(it.text)
+        p == PriorityType.URGENT || p == PriorityType.FOCUS
+    }
+
+    val gentleItems = otherActiveItems.filter {
+        val p = detectPriority(it.text)
+        p == PriorityType.LOW || p == PriorityType.NORMAL
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("To-Do List ", fontWeight = FontWeight.SemiBold) },
+                title = { Text("To-Do List", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.Close, contentDescription = "Back")
@@ -125,68 +193,128 @@ fun TodoScreen(
         }
     ) { padding ->
 
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .padding(top = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-
-            // ⭐ Header card: more like inspo
-            Card(
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                modifier = Modifier.fillMaxWidth()
+        if (items.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 12.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Soft plan for today \uD83D\uDCC5 ", fontWeight = FontWeight.Bold)
-                    Text(
-                        if (items.isEmpty()) "Add a small task you would like to get done"
-                        else "$remaining left • $completed done",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                ProgressHeaderCard(
+                    remaining = remaining,
+                    completed = completed,
+                    progress = progress
+                )
 
-                    // Priority chips row (cute, neutral)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PriorityPill(priority = PriorityType.URGENT)
-                        PriorityPill(priority = PriorityType.FOCUS)
-                        PriorityPill(priority = PriorityType.LOW)
-                    }
-                }
+                QuickAddCard(
+                    onAddClick = { showAddDialog = true }
+                )
+
+                EmptyTodoState(
+                    onAddClick = { showAddDialog = true }
+                )
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp)
+            ) {
+                item {
+                    ProgressHeaderCard(
+                        remaining = remaining,
+                        completed = completed,
+                        progress = progress
+                    )
+                }
 
-            if (items.isEmpty()) {
-                Card(
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("No tasks yet.", fontWeight = FontWeight.SemiBold)
-                        Text("Tap + to add one. Lets do this! ☺\uFE0F ")
+                item {
+                    QuickAddCard(
+                        onAddClick = { showAddDialog = true }
+                    )
+                }
+
+                topFocusItem?.let { todo ->
+                    item(key = "top-focus-header") {
+                        SectionHeader(
+                            title = "Top focus ✨",
+                            subtitle = "Your main thing to tackle first"
+                        )
+                    }
+
+                    item(key = "top-focus-card-${todo.id}") {
+                        TodoCard(
+                            item = todo,
+                            onToggle = { checked -> onToggle(todo.id, checked) },
+                            onEdit = { editing = todo },
+                            onDelete = { onDelete(todo.id) },
+                            isTopFocus = true
+                        )
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 14.dp)
-                ) {
-                    items(sortedItems, key = { it.id }) { item ->
+
+                if (focusFirstItems.isNotEmpty()) {
+                    item(key = "focus-first-header") {
+                        SectionHeader(
+                            title = "Focus first",
+                            subtitle = "More important or higher-effort tasks"
+                        )
+                    }
+
+                    items(focusFirstItems, key = { it.id }) { todo ->
                         TodoCard(
-                            item = item,
-                            onToggle = { checked -> onToggle(item.id, checked) },
-                            onEdit = { editing = item },
-                            onDelete = { onDelete(item.id) }
+                            item = todo,
+                            onToggle = { checked -> onToggle(todo.id, checked) },
+                            onEdit = { editing = todo },
+                            onDelete = { onDelete(todo.id) }
+                        )
+                    }
+                }
+
+                if (gentleItems.isNotEmpty()) {
+                    item(key = "gentle-header") {
+                        SectionHeader(
+                            title = "Gentle tasks 🌿",
+                            subtitle = "Smaller or lower-energy things"
+                        )
+                    }
+
+                    items(gentleItems, key = { it.id }) { todo ->
+                        TodoCard(
+                            item = todo,
+                            onToggle = { checked -> onToggle(todo.id, checked) },
+                            onEdit = { editing = todo },
+                            onDelete = { onDelete(todo.id) }
+                        )
+                    }
+                }
+
+                if (completedItems.isNotEmpty()) {
+                    item(key = "completed-header") {
+                        SectionHeader(
+                            title = "Completed ✓",
+                            subtitle = "Little wins still count"
+                        )
+                    }
+
+                    items(completedItems, key = { it.id }) { todo ->
+                        TodoCard(
+                            item = todo,
+                            onToggle = { checked -> onToggle(todo.id, checked) },
+                            onEdit = { editing = todo },
+                            onDelete = { onDelete(todo.id) }
                         )
                     }
                 }
             }
         }
 
-        // ADD dialog
         if (showAddDialog) {
             TaskDialog(
                 title = "Add a task",
@@ -200,19 +328,166 @@ fun TodoScreen(
             )
         }
 
-        // EDIT dialog
-        editing?.let { item ->
+        editing?.let { todo ->
             TaskDialog(
                 title = "Edit task",
                 confirmText = "Save",
-                initial = item.text,
+                initial = todo.text,
                 onDismiss = { editing = null },
                 onConfirm = { newText ->
-                    onEdit(item.id, newText)
+                    onEdit(todo.id, newText)
                     editing = null
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun ProgressHeaderCard(
+    remaining: Int,
+    completed: Int,
+    progress: Float
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Soft plan for today 📅",
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Text(
+                text = when {
+                    remaining == 0 && completed == 0 -> "Add one small thing to get started"
+                    remaining == 0 -> "Everything is done for now 🌷"
+                    else -> "$remaining left • $completed done"
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp),
+                trackColor = MaterialTheme.colorScheme.surface,
+                color = MaterialTheme.colorScheme.primary
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PriorityPill(priority = PriorityType.URGENT)
+                PriorityPill(priority = PriorityType.FOCUS)
+                PriorityPill(priority = PriorityType.LOW)
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAddCard(
+    onAddClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onAddClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Box(
+                    modifier = Modifier.size(34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null
+                    )
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Add a task",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "What’s one small thing you can do today?",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyTodoState(
+    onAddClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "No tasks yet 🌸",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Add one small task to get started. Tiny progress still counts.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            TextButton(onClick = onAddClick) {
+                Text("Add your first task")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+        )
     }
 }
 
@@ -231,7 +506,11 @@ private fun PriorityPill(priority: PriorityType) {
         ) {
             Text(priority.emoji)
             Spacer(Modifier.width(6.dp))
-            Text(priority.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = priority.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -241,22 +520,38 @@ private fun TodoCard(
     item: TodoItem,
     onToggle: (Boolean) -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isTopFocus: Boolean = false
 ) {
     val priority = detectPriority(item.text)
-    val border = priorityBorder(priority)
+    val border = if (isTopFocus) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.30f))
+    } else {
+        priorityBorder(priority)
+    }
 
-    // ✅ Completion animation: when you check it, it pops and fades a bit
-    val targetScale = if (item.isDone) 0.98f else 1f
-    val targetAlpha = if (item.isDone) 0.70f else 1f
+    var popped by remember { mutableStateOf(false) }
+
+    LaunchedEffect(item.isDone) {
+        if (item.isDone) {
+            popped = true
+            delay(120)
+            popped = false
+        }
+    }
 
     val scale by animateFloatAsState(
-        targetValue = targetScale,
-        animationSpec = spring(dampingRatio = 0.65f, stiffness = 380f),
+        targetValue = when {
+            popped -> 1.08f
+            item.isDone -> 0.95f
+            else -> 1f
+        },
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = 400f),
         label = "scale"
     )
+
     val alpha by animateFloatAsState(
-        targetValue = targetAlpha,
+        targetValue = if (item.isDone) 0.6f else 1f,
         animationSpec = tween(220),
         label = "alpha"
     )
@@ -264,15 +559,17 @@ private fun TodoCard(
     Card(
         shape = RoundedCornerShape(20.dp),
         border = border,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.isDone) {
+                MaterialTheme.colorScheme.surfaceVariant
+            } else {
+                priorityContainerColor(priority)
+            }
+        ),
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-            }
-            .shadow(elevation = 2.dp, shape = RoundedCornerShape(20.dp), clip = false)
+            .scale(scale)
+            .alpha(alpha)
     ) {
         Row(
             modifier = Modifier
@@ -280,8 +577,6 @@ private fun TodoCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            // checkbox in a soft circle background (more “designed”)
             Surface(
                 color = Color(0x14FFFFFF),
                 shape = CircleShape,
@@ -290,7 +585,7 @@ private fun TodoCard(
                 Box(contentAlignment = Alignment.Center) {
                     Checkbox(
                         checked = item.isDone,
-                        onCheckedChange = { onToggle(it) }
+                        onCheckedChange = { checked -> onToggle(checked) }
                     )
                 }
             }
@@ -301,19 +596,42 @@ private fun TodoCard(
                 modifier = Modifier
                     .weight(1f)
                     .clickable { onEdit() }
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                if (isTopFocus && !item.isDone) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Main task",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
 
-                // title row: emoji + text
                 Text(
                     text = "${priority.emoji}  ${item.text}",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (item.isDone) FontWeight.Normal else FontWeight.SemiBold
                 )
 
-                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = taskSupportText(priority, item.isDone),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.68f),
+                    fontStyle = if (item.isDone) FontStyle.Italic else FontStyle.Normal
+                )
 
-                // tiny pill tag (like inspo “in progress” vibe)
                 val (bg, txt) = priorityChipColors(priority)
                 Surface(
                     color = bg,
@@ -321,7 +639,11 @@ private fun TodoCard(
                     shape = RoundedCornerShape(999.dp)
                 ) {
                     Text(
-                        text = if (item.isDone) "completed" else priority.label,
+                        text = when {
+                            item.isDone -> "completed"
+                            isTopFocus -> "top focus"
+                            else -> priority.label
+                        },
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold
@@ -329,7 +651,6 @@ private fun TodoCard(
                 }
             }
 
-            // little edit icon for clarity
             IconButton(onClick = onEdit) {
                 Icon(Icons.Default.Edit, contentDescription = "Edit")
             }
@@ -357,7 +678,6 @@ private fun TaskDialog(
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
@@ -373,22 +693,37 @@ private fun TaskDialog(
                     shape = RoundedCornerShape(999.dp)
                 ) {
                     Text(
-                        "Detected: ${priority.emoji} ${priority.label}",
+                        text = "Detected: ${priority.emoji} ${priority.label}",
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+
+                Text(
+                    text = when (priority) {
+                        PriorityType.URGENT -> "Looks time-sensitive."
+                        PriorityType.FOCUS -> "Looks like focused work."
+                        PriorityType.LOW -> "Looks like a lighter task."
+                        PriorityType.NORMAL -> "A simple everyday task."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                )
             }
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(text.trim()) },
                 enabled = text.trim().isNotEmpty()
-            ) { Text(confirmText) }
+            ) {
+                Text(confirmText)
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
         }
     )
 }

@@ -25,9 +25,17 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = CalmPrimary,
+    secondary = CalmSecondary,
+    tertiary = CalmAccent,
+    background = Color(0xFFF5F0EB),       // ✅ warm parchment
+    surface = Color(0xFFFFFCF9),          // ✅ warm near-white cards
+    surfaceVariant = Color(0xFFEDE8E1),   // ✅ deeper inner cards
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onBackground = Color(0xFF1C1B1F),
+    onSurface = Color(0xFF1C1B1F),
+    onSurfaceVariant = Color(0xFF3A3A3A)
 )
 
 private val SageLightScheme = lightColorScheme(
@@ -62,7 +70,7 @@ private val MochaLightScheme = lightColorScheme(
 fun ConsoliCalmTheme(
     appTheme: AppTheme = AppTheme.DEFAULT,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
