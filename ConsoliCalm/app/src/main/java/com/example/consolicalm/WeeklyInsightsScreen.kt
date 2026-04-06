@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.dp
 
 data class WeeklyInsightStats(
     val pointsEarned: Int,
-    val focusMinutes: Int,
     val sessionsCompleted: Int,
+    val focusMinutes: Int,
     val streakDays: Int,
     val bestDay: String
 )
@@ -109,11 +109,8 @@ fun WeeklyInsightsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         WeeklyInsightsHeader(onBack = onBack)
-
         WeeklyOverviewCard(myStats = myStats)
-
         FriendsWeeklyHighlightsCard(highlights = friendHighlights)
-
         LeaderboardCard(leaderboard = leaderboard)
     }
 }

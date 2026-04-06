@@ -33,8 +33,13 @@ data class MeditationResource(
     val title: String,
     val description: String,
     val durationLabel: String,
-    val url: String
+    val url: String? = null,
+    val steps: List<String> = emptyList()
 )
+
+
+private fun youtubeSearchUrl(query: String): String =
+    "https://www.youtube.com/results?search_query=" + Uri.encode(query)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +66,7 @@ fun MeditationScreen(
 
     // Quick Calm (super short breathing reset)
     var showQuickCalm by remember { mutableStateOf(false) }
+    var selectedQuickBreathingResource by remember { mutableStateOf<MeditationResource?>(null) }
 
     // Top-level Calm tab filter (shows/hides sections; does not change any completed features)
     var calmFilter by remember { mutableStateOf(CalmTabFilter.ALL) }
@@ -112,16 +118,122 @@ fun MeditationScreen(
 
     val breathing = listOf(
         MeditationResource(
-            title = "Breathing for stress (NHS)",
-            description = "Simple guided breathing you can do anywhere.",
-            durationLabel = "~5 min",
-            url = "https://www.nhs.uk/mental-health/self-help/guides-tools-and-activities/breathing-exercises-for-stress/"
+            title = "Breathing for stress (NHS style)",
+            description = "Simple calming breaths you can do anywhere in the moment.",
+            durationLabel = "~2–3 min",
+            steps = listOf(
+                "Sit comfortably and drop your shoulders.",
+                "Breathe in gently through your nose for 4.",
+                "Breathe out slowly through your mouth for 6.",
+                "Repeat for 6 to 8 rounds.",
+                "Return to normal breathing and notice if your body feels softer."
+            )
         ),
         MeditationResource(
-            title = "4-7-8 relaxing breath (Dr. Weil)",
-            description = "A quick technique to calm your nervous system.",
+            title = "4-7-8 relaxing breath",
+            description = "A quick breathing pattern to slow things down fast.",
             durationLabel = "~2–3 min",
-            url = "https://www.drweil.com/videos-features/videos/breathing-exercises-4-7-8-breath/"
+            steps = listOf(
+                "Rest your tongue behind your top front teeth.",
+                "Inhale through your nose for 4.",
+                "Hold for 7.",
+                "Exhale slowly through your mouth for 8.",
+                "Repeat 3 to 4 rounds."
+            )
+        ),
+        MeditationResource(
+            title = "Box breathing reset",
+            description = "A square breathing pattern for steady focus and calm.",
+            durationLabel = "~1–3 min",
+            steps = listOf(
+                "Inhale for 4.",
+                "Hold for 4.",
+                "Exhale for 4.",
+                "Hold for 4.",
+                "Repeat 4 to 6 rounds."
+            )
+        ),
+        MeditationResource(
+            title = "Extended exhale breathing",
+            description = "Lengthen the exhale to help your body settle.",
+            durationLabel = "~2 min",
+            steps = listOf(
+                "Inhale gently through your nose for 4.",
+                "Exhale slowly for 6.",
+                "Keep your jaw and shoulders relaxed.",
+                "Repeat for about 8 rounds."
+            )
+        ),
+        MeditationResource(
+            title = "Balloon breathing",
+            description = "Picture your belly expanding like a balloon as you breathe.",
+            durationLabel = "~3 min",
+            steps = listOf(
+                "Place one hand on your stomach.",
+                "Inhale slowly and feel your stomach rise like a balloon.",
+                "Exhale and feel it soften back down.",
+                "Keep the inhale smooth and the exhale even.",
+                "Repeat for 1 to 2 minutes."
+            )
+        ),
+        MeditationResource(
+            title = "Calm breathing countdown",
+            description = "A simple counted rhythm when you want something structured.",
+            durationLabel = "~2 min",
+            steps = listOf(
+                "Inhale for 3.",
+                "Exhale for 3.",
+                "Inhale for 4.",
+                "Exhale for 4.",
+                "Continue the 4-in, 4-out pace until your breathing feels steady."
+            )
+        ),
+        MeditationResource(
+            title = "Triangle breathing",
+            description = "A 3-part breathing pattern to steady your attention.",
+            durationLabel = "~2–4 min",
+            steps = listOf(
+                "Inhale for 3.",
+                "Hold for 3.",
+                "Exhale for 3.",
+                "Repeat the triangle pattern for several rounds.",
+                "Let your breath stay gentle rather than forceful."
+            )
+        ),
+        MeditationResource(
+            title = "Belly breathing basics",
+            description = "Practice deeper breathing from the diaphragm instead of the chest.",
+            durationLabel = "~3 min",
+            steps = listOf(
+                "Put one hand on your chest and one on your stomach.",
+                "Try to keep the chest hand mostly still.",
+                "Breathe in slowly so the stomach hand rises first.",
+                "Exhale slowly and feel the stomach hand lower.",
+                "Repeat for 8 to 10 breaths."
+            )
+        ),
+        MeditationResource(
+            title = "Coherent breathing",
+            description = "Even breathing to help your body feel more regulated.",
+            durationLabel = "~5 min",
+            steps = listOf(
+                "Inhale for 5.",
+                "Exhale for 5.",
+                "Keep both parts of the breath smooth and equal.",
+                "Repeat for 3 to 5 minutes."
+            )
+        ),
+        MeditationResource(
+            title = "Pre-class breathing reset",
+            description = "A quick breathing break before class, homework, or studying.",
+            durationLabel = "~3 min",
+            steps = listOf(
+                "Sit up tall and rest both feet on the floor.",
+                "Take one deeper breath in.",
+                "Breathe in for 4 and out for 5.",
+                "Repeat while relaxing your shoulders and jaw.",
+                "Finish by naming the next small thing you are about to do."
+            )
         )
     )
 
@@ -137,6 +249,54 @@ fun MeditationScreen(
             description = "A short guided reset when you feel overwhelmed.",
             durationLabel = "~4 min",
             url = "https://www.youtube.com/watch?v=c1Ndym-IsQg"
+        ),
+        MeditationResource(
+            title = "5-minute mindfulness",
+            description = "A very short guided meditation for getting centered.",
+            durationLabel = "~5 min",
+            url = youtubeSearchUrl("5 minute mindfulness meditation guided")
+        ),
+        MeditationResource(
+            title = "Short meditation for anxiety",
+            description = "A calming audio/video reset when stress spikes.",
+            durationLabel = "~5 min",
+            url = youtubeSearchUrl("5 minute meditation for anxiety guided")
+        ),
+        MeditationResource(
+            title = "Morning reset meditation",
+            description = "A quick guided session for starting the day softer.",
+            durationLabel = "~6 min",
+            url = youtubeSearchUrl("6 minute morning meditation guided")
+        ),
+        MeditationResource(
+            title = "Meditation before homework",
+            description = "Short practice to transition into focus mode.",
+            durationLabel = "~5 min",
+            url = youtubeSearchUrl("5 minute meditation before studying")
+        ),
+        MeditationResource(
+            title = "Mini grounding meditation",
+            description = "Short session for feeling more present and steady.",
+            durationLabel = "~4 min",
+            url = youtubeSearchUrl("4 minute grounding meditation guided")
+        ),
+        MeditationResource(
+            title = "Body scan (short)",
+            description = "A gentle head-to-toe release in just a few minutes.",
+            durationLabel = "~7 min",
+            url = youtubeSearchUrl("7 minute body scan meditation")
+        ),
+        MeditationResource(
+            title = "Meditation for overwhelm",
+            description = "A short guided practice when everything feels like a lot.",
+            durationLabel = "~8 min",
+            url = youtubeSearchUrl("8 minute meditation for overwhelm")
+        ),
+        MeditationResource(
+            title = "Wind-down meditation",
+            description = "A short evening meditation to slow your mind down.",
+            durationLabel = "~10 min",
+            url = youtubeSearchUrl("10 minute wind down meditation guided")
         )
     )
 
@@ -152,6 +312,54 @@ fun MeditationScreen(
             description = "Browse short meditations, breathing practices, and sleep sounds.",
             durationLabel = "Varies",
             url = "https://www.youtube.com/c/headspace/videos"
+        ),
+        MeditationResource(
+            title = "10-minute meditation for focus",
+            description = "A deeper guided practice for settling into work.",
+            durationLabel = "~10 min",
+            url = youtubeSearchUrl("10 minute meditation for focus")
+        ),
+        MeditationResource(
+            title = "Meditation for study breaks",
+            description = "A slightly longer reset you can use between tasks.",
+            durationLabel = "~12 min",
+            url = youtubeSearchUrl("12 minute meditation study break")
+        ),
+        MeditationResource(
+            title = "Mindful movement + breathing",
+            description = "A longer practice if you need to move and calm down.",
+            durationLabel = "~15 min",
+            url = youtubeSearchUrl("15 minute mindful movement breathing")
+        ),
+        MeditationResource(
+            title = "Body scan (longer)",
+            description = "A slower, deeper release when you have more time.",
+            durationLabel = "~15 min",
+            url = youtubeSearchUrl("15 minute body scan meditation")
+        ),
+        MeditationResource(
+            title = "Meditation for stress recovery",
+            description = "Longer guided practice after a hard day or class.",
+            durationLabel = "~15 min",
+            url = youtubeSearchUrl("15 minute meditation for stress relief guided")
+        ),
+        MeditationResource(
+            title = "Progressive relaxation session",
+            description = "A full-body calming routine with more time to settle.",
+            durationLabel = "~20 min",
+            url = youtubeSearchUrl("20 minute progressive muscle relaxation guided")
+        ),
+        MeditationResource(
+            title = "Sleepy evening meditation",
+            description = "A slower guided session for shutting your brain off.",
+            durationLabel = "~20 min",
+            url = youtubeSearchUrl("20 minute evening meditation guided")
+        ),
+        MeditationResource(
+            title = "Longer mindfulness session",
+            description = "A deeper guided mindfulness practice for longer quiet time.",
+            durationLabel = "~25 min",
+            url = youtubeSearchUrl("25 minute mindfulness meditation guided")
         )
     )
 
@@ -393,7 +601,7 @@ Card(
             if (calmFilter == CalmTabFilter.ALL) {
                 SectionTitle("My Toolkit")
                 val showSavedSessions = (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.GUIDED_SESSIONS)
-                val showSavedResources = (calmFilter == CalmTabFilter.ALL || calmFilter == CalmTabFilter.ALL)
+                val showSavedResources = (calmFilter == CalmTabFilter.ALL)
 
                 if ((showSavedSessions && favoriteSessions.isEmpty()) && (showSavedResources && favoriteResources.isEmpty())) {
                     Text("Star a session or resource to save it here.")
@@ -444,7 +652,7 @@ Card(
                             resource = res,
                             isFavorite = true,
                             onToggleFavorite = { toggleFavorite(resourceKey(res)) },
-                            onOpen = { openUrl(res.url) }
+                            onOpen = { res.url?.let { openUrl(it) } }
                         )
                         }
                     }
@@ -534,7 +742,7 @@ SectionTitle("Quick breathing")
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
-                    onOpen = { openUrl(res.url) }
+                    onOpen = { selectedQuickBreathingResource = res }
                 )
                 }
 
@@ -548,7 +756,7 @@ SectionTitle("Short meditations")
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
-                    onOpen = { openUrl(res.url) }
+                    onOpen = { res.url?.let { openUrl(it) } }
                 )
                 }
 
@@ -562,13 +770,38 @@ SectionTitle("Longer sessions")
                     resource = res,
                     isFavorite = favorites.contains(resourceKey(res)),
                     onToggleFavorite = { toggleFavorite(resourceKey(res)) },
-                    onOpen = { openUrl(res.url) }
+                    onOpen = { res.url?.let { openUrl(it) } }
                 )
                 }
             
             }
 
         }
+    }
+
+    selectedQuickBreathingResource?.let { resource ->
+        AlertDialog(
+            onDismissRequest = { selectedQuickBreathingResource = null },
+            title = { Text(resource.title) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(resource.description)
+                    resource.steps.forEachIndexed { index, step ->
+                        Text("${index + 1}. $step")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = { selectedQuickBreathingResource = null }) {
+                    Text("Done")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedQuickBreathingResource = null }) {
+                    Text("Close")
+                }
+            }
+        )
     }
 
     // Full-screen guided session player
@@ -832,7 +1065,7 @@ private fun ResourceCard(
 
             AssistChip(
                 onClick = onOpen,
-                label = { Text(resource.durationLabel) }
+                label = { Text(if (resource.url == null) "View steps" else resource.durationLabel) }
             )
         }
     }

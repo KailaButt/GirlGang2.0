@@ -11,6 +11,8 @@ data class CalmSession(
 
 /**
  * Sessions used in the Calm tab. These are intentionally short and beginner-friendly.
+ * Guided Calm Sessions now includes 10 total guided exercises so the tab feels fuller
+ * without changing the surrounding UI.
  */
 fun defaultCalmSessions(): List<CalmSession> = listOf(
     CalmSession(
@@ -92,6 +94,59 @@ fun defaultCalmSessions(): List<CalmSession> = listOf(
             "Legs: tense 5s → release 10s.",
             "Feet: tense 5s → release 10s.",
             "End with a slow breath out and notice the difference."
+        )
+    ),
+    CalmSession(
+        id = "square_soften",
+        title = "Soften your shoulders",
+        description = "A guided tension release for shoulders, neck, and jaw.",
+        estimatedSeconds = 180,
+        steps = listOf(
+            "Take a slow inhale and lift your shoulders gently.",
+            "Exhale and let your shoulders drop.",
+            "Roll your shoulders back two times.",
+            "Relax your jaw and unclench your teeth.",
+            "Notice whether your neck feels a little softer."
+        )
+    ),
+    CalmSession(
+        id = "self_compassion_minute",
+        title = "One-minute self-compassion",
+        description = "A gentle guided reset when you feel hard on yourself.",
+        estimatedSeconds = 120,
+        steps = listOf(
+            "Put one hand on your chest or stomach.",
+            "Breathe in slowly for 4 and out for 6.",
+            "Say: This is a hard moment.",
+            "Say: I can take this one step at a time.",
+            "Say: Progress still counts today."
+        )
+    ),
+    CalmSession(
+        id = "counted_exhale",
+        title = "Counted exhale reset",
+        description = "A guided breathing exercise that makes the exhale longer than the inhale.",
+        estimatedSeconds = 180,
+        steps = listOf(
+            "Inhale through your nose for 3.",
+            "Exhale slowly for 5.",
+            "Repeat the 3-in / 5-out rhythm for five rounds.",
+            "Let your shoulders stay heavy and relaxed.",
+            "Finish with one normal breath and notice the pause."
+        )
+    ),
+    CalmSession(
+        id = "mindful_reset",
+        title = "Mindful reset before studying",
+        description = "A short guided transition from scattered to ready.",
+        estimatedSeconds = 240,
+        steps = listOf(
+            "Settle into your chair and place both feet on the floor.",
+            "Take two slow breaths.",
+            "Notice one thing you can see, hear, and feel right now.",
+            "Name the next small task you want to do.",
+            "Say it simply: I am starting with just this one step.",
+            "Open your materials and begin."
         )
     )
 )

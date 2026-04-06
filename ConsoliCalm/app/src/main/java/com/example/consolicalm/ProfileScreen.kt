@@ -2,22 +2,45 @@ package com.example.consolicalm
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.consolicalm.ui.theme.AppTheme
 import com.google.firebase.auth.EmailAuthProvider
@@ -55,55 +78,13 @@ fun ProfileScreen(
     var friendStatus by remember { mutableStateOf("") }
     var loadingFriendOp by remember { mutableStateOf(false) }
 
-    var addedYouList by remember { mutableStateOf<List<AddedYouItem>>(emptyList()) }
-    var requestStatus by remember { mutableStateOf("") }
-
     var resetInfo by remember { mutableStateOf<String?>(null) }
     var resetError by remember { mutableStateOf<String?>(null) }
-
-    var notifications by remember { mutableStateOf<List<AppNotification>>(emptyList()) }
-    var notificationStatus by remember { mutableStateOf("") }
-
-    suspend fun loadAddedYouRequests(currentUid: String) {
-        val result = db.collection("public_users")
-            .document(currentUid)
-            .collection("added_you")
-            .get()
-            .await()
-
-        addedYouList = result.documents.mapNotNull {
-            it.toObject(AddedYouItem::class.java)
-        }.sortedByDescending { it.timestamp }
-    }
-
-    suspend fun loadNotifications(currentUid: String) {
-        val result = db.collection("public_users")
-            .document(currentUid)
-            .collection("notifications")
-            .orderBy("timestamp")
-            .get()
-            .await()
-
-        notifications = result.documents.map { doc ->
-            AppNotification(
-                id = doc.id,
-                type = doc.getString("type") ?: "",
-                fromUid = doc.getString("fromUid") ?: "",
-                fromName = doc.getString("fromName") ?: "",
-                activityId = doc.getString("activityId") ?: "",
-                activityMessage = doc.getString("activityMessage") ?: "",
-                emoji = doc.getString("emoji") ?: "",
-                timestamp = doc.getLong("timestamp") ?: 0L,
-                read = doc.getBoolean("read") ?: false
-            )
-        }.sortedByDescending { it.timestamp }
-    }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(user?.uid) {
         if (user == null) {
             myFriendCode = null
-            addedYouList = emptyList()
-            notifications = emptyList()
             return@LaunchedEffect
         }
 
@@ -124,20 +105,8 @@ fun ProfileScreen(
                 val existingCode = doc.getString("friendCode")
                 myFriendCode = existingCode ?: user.uid.take(6).uppercase()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             friendStatus = "Couldn’t load friend code. Check internet."
-        }
-
-        try {
-            loadAddedYouRequests(user.uid)
-        } catch (e: Exception) {
-            addedYouList = emptyList()
-        }
-
-        try {
-            loadNotifications(user.uid)
-        } catch (e: Exception) {
-            notifications = emptyList()
         }
     }
 
@@ -200,65 +169,6 @@ fun ProfileScreen(
         return "Friend request sent ✅"
     }
 
-    suspend fun acceptFriendRequest(item: AddedYouItem): String {
-        val me = FirebaseAuth.getInstance().currentUser ?: return "Not logged in"
-
-        val friendData = hashMapOf(
-            "uid" to item.fromUid,
-            "nickname" to item.fromName,
-            "friendCode" to item.fromFriendCode,
-            "addedAt" to System.currentTimeMillis()
-        )
-
-        db.collection("public_users")
-            .document(me.uid)
-            .collection("friends")
-            .document(item.fromUid)
-            .set(friendData)
-            .await()
-
-        db.collection("public_users")
-            .document(me.uid)
-            .collection("added_you")
-            .document(item.fromUid)
-            .delete()
-            .await()
-
-        loadAddedYouRequests(me.uid)
-        return "Friend request accepted ✅"
-    }
-
-    suspend fun declineFriendRequest(item: AddedYouItem): String {
-        val me = FirebaseAuth.getInstance().currentUser ?: return "Not logged in"
-
-        db.collection("public_users")
-            .document(me.uid)
-            .collection("added_you")
-            .document(item.fromUid)
-            .delete()
-            .await()
-
-        loadAddedYouRequests(me.uid)
-        return "Friend request declined"
-    }
-
-    suspend fun markAllNotificationsRead() {
-        val me = FirebaseAuth.getInstance().currentUser ?: return
-        val batch = db.batch()
-
-        notifications.forEach { item ->
-            val ref = db.collection("public_users")
-                .document(me.uid)
-                .collection("notifications")
-                .document(item.id)
-
-            batch.update(ref, "read", true)
-        }
-
-        batch.commit().await()
-        loadNotifications(me.uid)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -274,7 +184,10 @@ fun ProfileScreen(
             IconButton(onClick = onBack) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
             }
-            Text("Profile", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "Profile",
+                style = MaterialTheme.typography.titleLarge
+            )
         }
 
         Box(
@@ -320,15 +233,15 @@ fun ProfileScreen(
                     onClick = {
                         userPrefs.nickname = nickname
 
-                        val u = FirebaseAuth.getInstance().currentUser
-                        if (u != null) {
+                        val currentUser = FirebaseAuth.getInstance().currentUser
+                        if (currentUser != null) {
                             db.collection("public_users")
-                                .document(u.uid)
+                                .document(currentUser.uid)
                                 .set(
                                     mapOf(
-                                        "uid" to u.uid,
+                                        "uid" to currentUser.uid,
                                         "nickname" to nickname,
-                                        "friendCode" to (myFriendCode ?: u.uid.take(6).uppercase())
+                                        "friendCode" to (myFriendCode ?: currentUser.uid.take(6).uppercase())
                                     )
                                 )
                         }
@@ -348,10 +261,16 @@ fun ProfileScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("Friends", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Friends",
+                    style = MaterialTheme.typography.titleMedium
+                )
 
                 if (user == null) {
-                    Text("Log in to use friends.", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "Log in to use friends.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 } else {
                     Text(
                         text = "Your Friend Code: ${myFriendCode ?: "Loading..."}",
@@ -376,7 +295,7 @@ fun ProfileScreen(
                                     if (friendStatus.contains("✅")) {
                                         friendCodeInput = ""
                                     }
-                                } catch (e: Exception) {
+                                } catch (_: Exception) {
                                     friendStatus = "Couldn’t add friend. Check internet."
                                 } finally {
                                     loadingFriendOp = false
@@ -392,10 +311,11 @@ fun ProfileScreen(
                     if (friendStatus.isNotBlank()) {
                         Text(
                             text = friendStatus,
-                            color = if (friendStatus.contains("✅"))
+                            color = if (friendStatus.contains("✅")) {
                                 MaterialTheme.colorScheme.primary
-                            else
+                            } else {
                                 MaterialTheme.colorScheme.error
+                            }
                         )
                     }
                 }
@@ -411,207 +331,18 @@ fun ProfileScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "Friend Requests",
+                    text = "Themes",
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                if (user == null) {
-                    Text("Log in to see requests.", style = MaterialTheme.typography.bodyMedium)
-                } else if (addedYouList.isEmpty()) {
-                    Text(
-                        text = "No pending requests.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                } else {
-                    addedYouList.forEach { item ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = item.fromName,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "wants to connect with you",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            scope.launch {
-                                                requestStatus = try {
-                                                    acceptFriendRequest(item)
-                                                } catch (e: Exception) {
-                                                    "Couldn’t accept request."
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Accept")
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            scope.launch {
-                                                requestStatus = try {
-                                                    declineFriendRequest(item)
-                                                } catch (e: Exception) {
-                                                    "Couldn’t decline request."
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Decline")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (requestStatus.isNotBlank()) {
-                    Text(
-                        text = requestStatus,
-                        color = if (requestStatus.contains("✅"))
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Notifications,
-                            contentDescription = null
-                        )
-                        Text(
-                            text = "Notifications",
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    if (notifications.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                scope.launch {
-                                    try {
-                                        markAllNotificationsRead()
-                                        notificationStatus = "Marked all as read"
-                                    } catch (_: Exception) {
-                                        notificationStatus = "Couldn’t update notifications"
-                                    }
-                                }
-                            }
-                        ) {
-                            Text("Mark all read")
-                        }
-                    }
-                }
-
-                if (user == null) {
-                    Text("Log in to see notifications.")
-                } else if (notifications.isEmpty()) {
-                    Text("No notifications yet 🌸")
-                } else {
-                    notifications.forEach { item ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (item.read) {
-                                    MaterialTheme.colorScheme.surfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                                }
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = when (item.type) {
-                                        "reaction" -> "${item.fromName} reacted ${item.emoji} to your activity"
-                                        else -> "New notification"
-                                    },
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-
-                                if (item.activityMessage.isNotBlank()) {
-                                    Text(
-                                        text = "\"${item.activityMessage}\"",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-
-                                Text(
-                                    text = formatNotificationTimestamp(item.timestamp),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (notificationStatus.isNotBlank()) {
-                    Text(
-                        text = notificationStatus,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text("Themes", style = MaterialTheme.typography.titleMedium)
-
                 Text(
-                    "Pick a look for the app.",
+                    text = "Pick a look for the app.",
                     style = MaterialTheme.typography.bodyMedium
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     ThemeButton(
                         label = "Default",
                         selected = selectedTheme == AppTheme.DEFAULT,
@@ -631,10 +362,6 @@ fun ProfileScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        var showChangePasswordDialog by remember { mutableStateOf(false) }
-
         TextButton(
             onClick = {
                 resetInfo = null
@@ -647,16 +374,18 @@ fun ProfileScreen(
         }
 
         if (resetError != null) {
-            Text(resetError!!, color = MaterialTheme.colorScheme.error)
-            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = resetError!!,
+                color = MaterialTheme.colorScheme.error
+            )
         }
 
         if (resetInfo != null) {
-            Text(resetInfo!!, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = resetInfo!!,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
 
         if (showChangePasswordDialog) {
             val auth = FirebaseAuth.getInstance()
@@ -671,29 +400,34 @@ fun ProfileScreen(
                 onDismissRequest = { showChangePasswordDialog = false },
                 title = { Text("Change password") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Text("Enter your current password and your new password.")
+
                         OutlinedTextField(
                             value = currentPassword,
                             onValueChange = { currentPassword = it },
                             label = { Text("Current password") },
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
                         OutlinedTextField(
                             value = newPassword,
                             onValueChange = { newPassword = it },
                             label = { Text("New password") },
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
+
                         OutlinedTextField(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
                             label = { Text("Confirm new password") },
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            visualTransformation = PasswordVisualTransformation(),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -743,7 +477,9 @@ fun ProfileScreen(
                                         }
                                 }
                         }
-                    ) { Text("Update") }
+                    ) {
+                        Text("Update")
+                    }
                 },
                 dismissButton = {
                     TextButton(onClick = { showChangePasswordDialog = false }) {
@@ -769,7 +505,7 @@ fun ProfileScreen(
     }
 }
 
-private fun formatNotificationTimestamp(timestamp: Long): String {
+fun formatNotificationTimestamp(timestamp: Long): String {
     if (timestamp <= 0L) return "today"
 
     val now = System.currentTimeMillis()
@@ -792,8 +528,12 @@ private fun ThemeButton(
     onClick: () -> Unit
 ) {
     if (selected) {
-        Button(onClick = onClick) { Text(label) }
+        Button(onClick = onClick) {
+            Text(label)
+        }
     } else {
-        OutlinedButton(onClick = onClick) { Text(label) }
+        OutlinedButton(onClick = onClick) {
+            Text(label)
+        }
     }
 }

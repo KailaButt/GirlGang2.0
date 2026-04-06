@@ -6,7 +6,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -29,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import com.example.consolicalm.ui.theme.AppScaffold
 import com.example.consolicalm.ui.theme.AppTheme
 import com.example.consolicalm.ui.theme.ConsoliCalmTheme
+import com.google.firebase.auth.FirebaseAuth
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     HOME("Home", Icons.Filled.Home),
@@ -57,6 +63,17 @@ class MainActivity : ComponentActivity() {
                             getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                         }
 
+                        val weeklyInsightsRepository = remember { WeeklyInsightsRepository() }
+
+                        val currentNickname = remember {
+                            val user = FirebaseAuth.getInstance().currentUser
+                            when {
+                                !user?.displayName.isNullOrBlank() -> user?.displayName!!
+                                !user?.email.isNullOrBlank() -> user?.email!!.substringBefore("@")
+                                else -> "You"
+                            }
+                        }
+
                         var calmPoints by remember {
                             mutableIntStateOf(prefs.getInt(KEY_POINTS, 240))
                         }
@@ -77,42 +94,6 @@ class MainActivity : ComponentActivity() {
 
                         var showStrikeDialog by remember { mutableStateOf(false) }
                         var strikeMessage by remember { mutableStateOf("") }
-
-                        val myWeeklyStats = remember(calmPoints) {
-                            WeeklyInsightStats(
-                                pointsEarned = calmPoints,
-                                focusMinutes = 165,
-                                sessionsCompleted = 7,
-                                streakDays = 4,
-                                bestDay = "Wednesday"
-                            )
-                        }
-
-                        val weeklyLeaderboard = remember(calmPoints) {
-                            listOf(
-                                LeaderboardEntry(
-                                    name = "Maddie",
-                                    points = 420,
-                                    sessions = 8
-                                ),
-                                LeaderboardEntry(
-                                    name = "Kaila",
-                                    points = calmPoints,
-                                    sessions = 7,
-                                    isYou = true
-                                ),
-                                LeaderboardEntry(
-                                    name = "Praniksha",
-                                    points = 356,
-                                    sessions = 6
-                                ),
-                                LeaderboardEntry(
-                                    name = "Kaila B",
-                                    points = 312,
-                                    sessions = 5
-                                )
-                            )
-                        }
 
                         fun handleLeaveAttempt(target: AppTab) {
                             val locked = focusRunning && !breakRunning
@@ -176,9 +157,7 @@ class MainActivity : ComponentActivity() {
                                 when (currentTab) {
                                     AppTab.HOME -> {
                                         if (showInsights) {
-                                            WeeklyInsightsScreen(
-                                                myStats = myWeeklyStats,
-                                                leaderboard = weeklyLeaderboard,
+                                            WeeklyInsightsRoute(
                                                 onBack = { showInsights = false }
                                             )
                                         } else {
@@ -191,14 +170,22 @@ class MainActivity : ComponentActivity() {
                                                 onMeditationClick = { currentTab = AppTab.CALM },
                                                 onStudyClick = { currentTab = AppTab.STUDY },
                                                 onInsightsClick = { showInsights = true },
-                                                onEarnPoints = { earned -> calmPoints += earned }
+                                                onEarnPoints = { earned ->
+                                                    calmPoints += earned
+
+                                                    weeklyInsightsRepository.incrementWeeklyStats(
+                                                        nickname = currentNickname,
+                                                        pointsToAdd = earned
+                                                    )
+                                                }
                                             )
                                         }
                                     }
 
                                     AppTab.REWARDS -> RewardsScreen(
                                         calmPoints = calmPoints,
-                                        onBack = { currentTab = AppTab.HOME }
+                                        onBack = { currentTab = AppTab.HOME },
+                                        onRedeem = { cost -> calmPoints = (calmPoints - cost).coerceAtLeast(0) }
                                     )
 
                                     AppTab.PROFILE -> ProfileScreen(
@@ -209,7 +196,14 @@ class MainActivity : ComponentActivity() {
 
                                     AppTab.CALM -> MeditationScreen(
                                         onBack = { currentTab = AppTab.HOME },
-                                        onEarnPoints = { earned -> calmPoints += earned }
+                                        onEarnPoints = { earned ->
+                                            calmPoints += earned
+
+                                            weeklyInsightsRepository.incrementWeeklyStats(
+                                                nickname = currentNickname,
+                                                pointsToAdd = earned
+                                            )
+                                        }
                                     )
 
                                     AppTab.TODO -> TodoScreen(
@@ -222,7 +216,16 @@ class MainActivity : ComponentActivity() {
                                         onToggle = { id, checked ->
                                             val idx = todoItems.indexOfFirst { it.id == id }
                                             if (idx != -1) {
+                                                val wasDone = todoItems[idx].isDone
                                                 todoItems[idx] = todoItems[idx].copy(isDone = checked)
+
+                                                if (!wasDone && checked) {
+                                                    weeklyInsightsRepository.incrementWeeklyStats(
+                                                        nickname = currentNickname,
+                                                        pointsToAdd = 10,
+                                                        tasksToAdd = 1
+                                                    )
+                                                }
                                             }
                                         },
                                         onEdit = { id, newText ->
@@ -237,7 +240,16 @@ class MainActivity : ComponentActivity() {
 
                                     AppTab.STUDY -> StudyScreen(
                                         onBack = { currentTab = AppTab.HOME },
-                                        onSessionComplete = { earned -> calmPoints += earned },
+                                        onSessionComplete = { earned ->
+                                            calmPoints += earned
+
+                                            weeklyInsightsRepository.incrementWeeklyStats(
+                                                nickname = currentNickname,
+                                                pointsToAdd = earned,
+                                                sessionsToAdd = 1,
+                                                calmMinutesToAdd = 25
+                                            )
+                                        },
                                         onFocusState = { isRunningFocus, isRunningBreak ->
                                             focusRunning = isRunningFocus || isRunningBreak
                                             breakRunning = isRunningBreak

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -70,16 +70,25 @@ data class TodoItem(
     val isDone: Boolean = false
 )
 
-private enum class PriorityType(val label: String, val emoji: String, val rank: Int) {
-    URGENT("urgent", "🚨", 3),
-    FOCUS("focus", "🧠", 2),
-    LOW("nice to get to", "🌿", 1),
-    NORMAL("normal", "✨", 0)
+private enum class PriorityType(
+    val label: String,
+    val emoji: String,
+    val rank: Int,
+    val tag: String
+) {
+    URGENT("urgent", "🚨", 3, "[urgent]"),
+    FOCUS("focus", "🧠", 2, "[focus]"),
+    LOW("nice to get to", "🌿", 1, "[gentle]"),
+    NORMAL("normal", "✨", 0, "")
 }
 
-private fun detectPriority(text: String): PriorityType {
-    val t = text.lowercase(Locale.getDefault())
+private fun detectPriority(rawText: String): PriorityType {
+    val t = rawText.lowercase(Locale.getDefault()).trim()
+
     return when {
+        t.startsWith("[urgent]") -> PriorityType.URGENT
+        t.startsWith("[focus]") -> PriorityType.FOCUS
+        t.startsWith("[gentle]") -> PriorityType.LOW
         listOf("exam", "test", "quiz", "due", "deadline", "asap", "urgent", "submit").any { it in t } ->
             PriorityType.URGENT
 
@@ -90,6 +99,54 @@ private fun detectPriority(text: String): PriorityType {
             PriorityType.LOW
 
         else -> PriorityType.NORMAL
+    }
+}
+
+private fun removePriorityTag(rawText: String): String {
+    return rawText
+        .replace("[urgent]", "", ignoreCase = true)
+        .replace("[focus]", "", ignoreCase = true)
+        .replace("[gentle]", "", ignoreCase = true)
+        .trim()
+}
+
+private fun taskParts(rawText: String): List<String> {
+    return removePriorityTag(rawText)
+        .split("|")
+        .map { it.trim() }
+}
+
+private fun displayTaskText(rawText: String): String {
+    return taskParts(rawText).getOrNull(0).orEmpty()
+}
+
+private fun displayDueDate(rawText: String): String {
+    return taskParts(rawText).getOrNull(1).orEmpty()
+}
+
+private fun displayDueTime(rawText: String): String {
+    return taskParts(rawText).getOrNull(2).orEmpty()
+}
+
+private fun buildTaskText(
+    task: String,
+    dueDate: String,
+    dueTime: String,
+    priority: PriorityType
+): String {
+    val cleanTask = task.trim()
+    val cleanDate = dueDate.trim()
+    val cleanTime = dueTime.trim()
+
+    val prefix = if (priority == PriorityType.NORMAL) "" else "${priority.tag} "
+    val suffix = listOf(cleanDate, cleanTime)
+        .filter { it.isNotBlank() }
+        .joinToString(" | ")
+
+    return if (suffix.isBlank()) {
+        prefix + cleanTask
+    } else {
+        "$prefix$cleanTask | $suffix"
     }
 }
 
@@ -142,6 +199,7 @@ fun TodoScreen(
     onBack: () -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedPriority by remember { mutableStateOf(PriorityType.NORMAL) }
     var editing by remember { mutableStateOf<TodoItem?>(null) }
 
     val remaining = items.count { !it.isDone }
@@ -154,7 +212,7 @@ fun TodoScreen(
             items.sortedWith(
                 compareBy<TodoItem> { it.isDone }
                     .thenByDescending { detectPriority(it.text).rank }
-                    .thenBy { it.text.lowercase(Locale.getDefault()) }
+                    .thenBy { displayTaskText(it.text).lowercase(Locale.getDefault()) }
             )
         }
     }
@@ -183,11 +241,6 @@ fun TodoScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.Close, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showAddDialog = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add task")
-                    }
                 }
             )
         }
@@ -206,15 +259,18 @@ fun TodoScreen(
                 ProgressHeaderCard(
                     remaining = remaining,
                     completed = completed,
-                    progress = progress
-                )
-
-                QuickAddCard(
-                    onAddClick = { showAddDialog = true }
+                    progress = progress,
+                    onPriorityClick = { priority ->
+                        selectedPriority = priority
+                        showAddDialog = true
+                    }
                 )
 
                 EmptyTodoState(
-                    onAddClick = { showAddDialog = true }
+                    onAddClick = {
+                        selectedPriority = PriorityType.NORMAL
+                        showAddDialog = true
+                    }
                 )
             }
         } else {
@@ -230,13 +286,11 @@ fun TodoScreen(
                     ProgressHeaderCard(
                         remaining = remaining,
                         completed = completed,
-                        progress = progress
-                    )
-                }
-
-                item {
-                    QuickAddCard(
-                        onAddClick = { showAddDialog = true }
+                        progress = progress,
+                        onPriorityClick = { priority ->
+                            selectedPriority = priority
+                            showAddDialog = true
+                        }
                     )
                 }
 
@@ -244,7 +298,11 @@ fun TodoScreen(
                     item(key = "top-focus-header") {
                         SectionHeader(
                             title = "Top focus ✨",
-                            subtitle = "Your main thing to tackle first"
+                            subtitle = "Your main thing to tackle first",
+                            onClick = {
+                                selectedPriority = PriorityType.FOCUS
+                                showAddDialog = true
+                            }
                         )
                     }
 
@@ -263,7 +321,11 @@ fun TodoScreen(
                     item(key = "focus-first-header") {
                         SectionHeader(
                             title = "Focus first",
-                            subtitle = "More important or higher-effort tasks"
+                            subtitle = "More important or higher-effort tasks",
+                            onClick = {
+                                selectedPriority = PriorityType.FOCUS
+                                showAddDialog = true
+                            }
                         )
                     }
 
@@ -281,7 +343,11 @@ fun TodoScreen(
                     item(key = "gentle-header") {
                         SectionHeader(
                             title = "Gentle tasks 🌿",
-                            subtitle = "Smaller or lower-energy things"
+                            subtitle = "Smaller or lower-energy things",
+                            onClick = {
+                                selectedPriority = PriorityType.LOW
+                                showAddDialog = true
+                            }
                         )
                     }
 
@@ -319,10 +385,13 @@ fun TodoScreen(
             TaskDialog(
                 title = "Add a task",
                 confirmText = "Add",
-                initial = "",
+                initialTask = "",
+                initialDate = "",
+                initialTime = "",
+                initialPriority = selectedPriority,
                 onDismiss = { showAddDialog = false },
-                onConfirm = { text ->
-                    onAdd(text)
+                onConfirm = { task, date, time, priority ->
+                    onAdd(buildTaskText(task, date, time, priority))
                     showAddDialog = false
                 }
             )
@@ -332,10 +401,13 @@ fun TodoScreen(
             TaskDialog(
                 title = "Edit task",
                 confirmText = "Save",
-                initial = todo.text,
+                initialTask = displayTaskText(todo.text),
+                initialDate = displayDueDate(todo.text),
+                initialTime = displayDueTime(todo.text),
+                initialPriority = detectPriority(todo.text),
                 onDismiss = { editing = null },
-                onConfirm = { newText ->
-                    onEdit(todo.id, newText)
+                onConfirm = { task, date, time, priority ->
+                    onEdit(todo.id, buildTaskText(task, date, time, priority))
                     editing = null
                 }
             )
@@ -347,7 +419,8 @@ fun TodoScreen(
 private fun ProgressHeaderCard(
     remaining: Int,
     completed: Int,
-    progress: Float
+    progress: Float,
+    onPriorityClick: (PriorityType) -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
@@ -382,57 +455,21 @@ private fun ProgressHeaderCard(
                 color = MaterialTheme.colorScheme.primary
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PriorityPill(priority = PriorityType.URGENT)
-                PriorityPill(priority = PriorityType.FOCUS)
-                PriorityPill(priority = PriorityType.LOW)
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickAddCard(
-    onAddClick: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onAddClick() }
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
-                Box(
-                    modifier = Modifier.size(34.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Add a task",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
+                PriorityPill(
+                    priority = PriorityType.URGENT,
+                    onClick = { onPriorityClick(PriorityType.URGENT) }
                 )
-                Text(
-                    text = "What’s one small thing you can do today?",
-                    style = MaterialTheme.typography.bodySmall
+                PriorityPill(
+                    priority = PriorityType.FOCUS,
+                    onClick = { onPriorityClick(PriorityType.FOCUS) }
+                )
+                PriorityPill(
+                    priority = PriorityType.LOW,
+                    onClick = { onPriorityClick(PriorityType.LOW) }
                 )
             }
         }
@@ -459,7 +496,7 @@ private fun EmptyTodoState(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Add one small task to get started. Tiny progress still counts.",
+                text = "Tap a priority above or add one small task to get started.",
                 style = MaterialTheme.typography.bodyMedium
             )
             TextButton(onClick = onAddClick) {
@@ -472,10 +509,15 @@ private fun EmptyTodoState(
 @Composable
 private fun SectionHeader(
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: (() -> Unit)? = null
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable { onClick() } else Modifier
+            ),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(
@@ -492,13 +534,17 @@ private fun SectionHeader(
 }
 
 @Composable
-private fun PriorityPill(priority: PriorityType) {
+private fun PriorityPill(
+    priority: PriorityType,
+    onClick: (() -> Unit)? = null
+) {
     val (bg, txt) = priorityChipColors(priority)
     Surface(
         color = bg,
         contentColor = txt,
         shape = RoundedCornerShape(999.dp),
-        tonalElevation = 0.dp
+        tonalElevation = 0.dp,
+        modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -529,6 +575,10 @@ private fun TodoCard(
     } else {
         priorityBorder(priority)
     }
+
+    val taskText = displayTaskText(item.text)
+    val dueDate = displayDueDate(item.text)
+    val dueTime = displayDueTime(item.text)
 
     var popped by remember { mutableStateOf(false) }
 
@@ -620,10 +670,19 @@ private fun TodoCard(
                 }
 
                 Text(
-                    text = "${priority.emoji}  ${item.text}",
+                    text = "${priority.emoji}  $taskText",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (item.isDone) FontWeight.Normal else FontWeight.SemiBold
                 )
+
+                if (dueDate.isNotBlank() || dueTime.isNotBlank()) {
+                    Text(
+                        text = listOf(dueDate, dueTime).filter { it.isNotBlank() }.joinToString(" • "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
 
                 Text(
                     text = taskSupportText(priority, item.isDone),
@@ -666,12 +725,17 @@ private fun TodoCard(
 private fun TaskDialog(
     title: String,
     confirmText: String,
-    initial: String,
+    initialTask: String,
+    initialDate: String,
+    initialTime: String,
+    initialPriority: PriorityType,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String, String, String, PriorityType) -> Unit
 ) {
-    var text by remember { mutableStateOf(initial) }
-    val priority = detectPriority(text)
+    var task by remember { mutableStateOf(initialTask) }
+    var dueDate by remember { mutableStateOf(initialDate) }
+    var dueTime by remember { mutableStateOf(initialTime) }
+    var selectedPriority by remember { mutableStateOf(initialPriority) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -679,33 +743,70 @@ private fun TaskDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
+                    value = task,
+                    onValueChange = { task = it },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Ex: study for exam") },
-                    singleLine = true
+                    singleLine = true,
+                    label = { Text("Task") }
                 )
 
-                val (bg, txt) = priorityChipColors(priority)
-                Surface(
-                    color = bg,
-                    contentColor = txt,
-                    shape = RoundedCornerShape(999.dp)
+                OutlinedTextField(
+                    value = dueDate,
+                    onValueChange = { dueDate = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ex: Apr 10") },
+                    singleLine = true,
+                    label = { Text("Due date") }
+                )
+
+                OutlinedTextField(
+                    value = dueTime,
+                    onValueChange = { dueTime = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Ex: 3:00 PM") },
+                    singleLine = true,
+                    label = { Text("Due time") }
+                )
+
+                Text(
+                    text = "Choose section",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = "Detected: ${priority.emoji} ${priority.label}",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold
+                    SelectablePriorityPill(
+                        priority = PriorityType.URGENT,
+                        selected = selectedPriority == PriorityType.URGENT,
+                        onClick = { selectedPriority = PriorityType.URGENT }
+                    )
+                    SelectablePriorityPill(
+                        priority = PriorityType.FOCUS,
+                        selected = selectedPriority == PriorityType.FOCUS,
+                        onClick = { selectedPriority = PriorityType.FOCUS }
+                    )
+                    SelectablePriorityPill(
+                        priority = PriorityType.LOW,
+                        selected = selectedPriority == PriorityType.LOW,
+                        onClick = { selectedPriority = PriorityType.LOW }
+                    )
+                    SelectablePriorityPill(
+                        priority = PriorityType.NORMAL,
+                        selected = selectedPriority == PriorityType.NORMAL,
+                        onClick = { selectedPriority = PriorityType.NORMAL }
                     )
                 }
 
                 Text(
-                    text = when (priority) {
-                        PriorityType.URGENT -> "Looks time-sensitive."
-                        PriorityType.FOCUS -> "Looks like focused work."
-                        PriorityType.LOW -> "Looks like a lighter task."
-                        PriorityType.NORMAL -> "A simple everyday task."
+                    text = when (selectedPriority) {
+                        PriorityType.URGENT -> "This will show as urgent."
+                        PriorityType.FOCUS -> "This will show in focus tasks."
+                        PriorityType.LOW -> "This will show in gentle tasks."
+                        PriorityType.NORMAL -> "This will be treated like a regular task."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
@@ -714,8 +815,15 @@ private fun TaskDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(text.trim()) },
-                enabled = text.trim().isNotEmpty()
+                onClick = {
+                    onConfirm(
+                        task.trim(),
+                        dueDate.trim(),
+                        dueTime.trim(),
+                        selectedPriority
+                    )
+                },
+                enabled = task.trim().isNotEmpty()
             ) {
                 Text(confirmText)
             }
@@ -726,4 +834,34 @@ private fun TaskDialog(
             }
         }
     )
+}
+
+@Composable
+private fun SelectablePriorityPill(
+    priority: PriorityType,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val (bg, txt) = priorityChipColors(priority)
+
+    Surface(
+        color = if (selected) txt.copy(alpha = 0.16f) else bg,
+        contentColor = if (selected) txt else txt,
+        shape = RoundedCornerShape(999.dp),
+        border = if (selected) BorderStroke(1.5.dp, txt) else null,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(priority.emoji)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = priority.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
 }
