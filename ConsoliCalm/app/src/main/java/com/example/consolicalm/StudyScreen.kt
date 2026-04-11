@@ -225,7 +225,7 @@ private fun ModeSelectionScreen(
                             color = Color(0xFFE6EEF0)
                         ) {
                             Text(
-                                text = "AI Reset",
+                                text = "",
                                 color = deepBlue,
                                 style = MaterialTheme.typography.labelLarge,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)

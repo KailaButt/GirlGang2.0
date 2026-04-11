@@ -1,6 +1,7 @@
 package com.example.consolicalm
 
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,8 @@ import com.example.consolicalm.ui.theme.AppTheme
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -55,6 +58,57 @@ data class AddedYouItem(
     val fromFriendCode: String = "",
     val timestamp: Long = 0L
 )
+
+private const val PROFILE_TAG = "ProfileScreen"
+
+private fun fallbackFriendCode(uid: String): String = uid.take(6).uppercase()
+
+private fun friendMessageForException(e: Exception): String {
+    val firestoreError = e as? FirebaseFirestoreException
+    return when (firestoreError?.code) {
+        FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+            "Couldn’t load friend code. Firestore permissions are blocking access."
+        FirebaseFirestoreException.Code.UNAUTHENTICATED ->
+            "Couldn’t load friend code. Please log out and back in."
+        FirebaseFirestoreException.Code.UNAVAILABLE ->
+            "Couldn’t reach Firestore right now. Try again in a moment."
+        else -> "Couldn’t load friend code right now."
+    }
+}
+
+private suspend fun ensurePublicUserDoc(
+    db: FirebaseFirestore,
+    uid: String,
+    nickname: String,
+    existingFriendCode: String? = null
+): String {
+    val userRef = db.collection("public_users").document(uid)
+    val fallbackCode = existingFriendCode ?: fallbackFriendCode(uid)
+
+    val doc = userRef.get().await()
+    if (!doc.exists()) {
+        userRef.set(
+            mapOf(
+                "uid" to uid,
+                "nickname" to nickname,
+                "friendCode" to fallbackCode
+            ),
+            SetOptions.merge()
+        ).await()
+        return fallbackCode
+    }
+
+    val storedCode = doc.getString("friendCode")?.takeIf { it.isNotBlank() } ?: fallbackCode
+    val updates = mutableMapOf<String, Any>(
+        "uid" to uid,
+        "friendCode" to storedCode
+    )
+    if (nickname.isNotBlank() && doc.getString("nickname") != nickname) {
+        updates["nickname"] = nickname
+    }
+    userRef.set(updates, SetOptions.merge()).await()
+    return storedCode
+}
 
 @Composable
 fun ProfileScreen(
@@ -72,8 +126,9 @@ fun ProfileScreen(
 
     val userPrefs = UserPrefs(context)
     var nickname by remember { mutableStateOf(userPrefs.nickname ?: "") }
+    var cachedFriendCode by remember { mutableStateOf(user?.uid?.let { fallbackFriendCode(it) }) }
 
-    var myFriendCode by remember { mutableStateOf<String?>(null) }
+    var myFriendCode by remember { mutableStateOf<String?>(cachedFriendCode) }
     var friendCodeInput by remember { mutableStateOf("") }
     var friendStatus by remember { mutableStateOf("") }
     var loadingFriendOp by remember { mutableStateOf(false) }
@@ -85,28 +140,32 @@ fun ProfileScreen(
     LaunchedEffect(user?.uid) {
         if (user == null) {
             myFriendCode = null
+            cachedFriendCode = null
             return@LaunchedEffect
         }
 
-        try {
-            val userRef = db.collection("public_users").document(user.uid)
-            val doc = userRef.get().await()
+        val localFallback = fallbackFriendCode(user.uid)
+        myFriendCode = cachedFriendCode ?: localFallback
+        cachedFriendCode = localFallback
+        friendStatus = ""
 
-            if (!doc.exists()) {
-                val generatedCode = user.uid.take(6).uppercase()
-                val newUser = hashMapOf(
-                    "uid" to user.uid,
-                    "nickname" to (userPrefs.nickname ?: ""),
-                    "friendCode" to generatedCode
-                )
-                userRef.set(newUser).await()
-                myFriendCode = generatedCode
-            } else {
-                val existingCode = doc.getString("friendCode")
-                myFriendCode = existingCode ?: user.uid.take(6).uppercase()
-            }
-        } catch (_: Exception) {
-            friendStatus = "Couldn’t load friend code. Check internet."
+        try {
+            val resolvedCode = ensurePublicUserDoc(
+                db = db,
+                uid = user.uid,
+                nickname = userPrefs.nickname ?: nickname,
+                existingFriendCode = localFallback
+            )
+            myFriendCode = resolvedCode
+            cachedFriendCode = resolvedCode
+        } catch (e: Exception) {
+            Log.e(PROFILE_TAG, "Failed to load friend code", e)
+            myFriendCode = localFallback
+            cachedFriendCode = localFallback
+            // Keep the usable fallback code visible without showing a scary error on load.
+            // Firestore permission or sync issues should only surface when the cloud action
+            // actually matters, such as sending a friend request.
+            friendStatus = if (localFallback.isBlank()) friendMessageForException(e) else ""
         }
     }
 
@@ -115,6 +174,15 @@ fun ProfileScreen(
         val code = codeRaw.trim().uppercase()
 
         if (code.length < 6) return "Friend code must be 6+ characters"
+
+        val myCode = ensurePublicUserDoc(
+            db = db,
+            uid = me.uid,
+            nickname = userPrefs.nickname ?: nickname,
+            existingFriendCode = myFriendCode ?: cachedFriendCode
+        )
+        myFriendCode = myCode
+        cachedFriendCode = myCode
 
         val match = db.collection("public_users")
             .whereEqualTo("friendCode", code)
@@ -150,12 +218,12 @@ fun ProfileScreen(
 
         val myNickname = myDoc.getString("nickname")?.trim().orEmpty()
         val myDisplayName = if (myNickname.isNotBlank()) myNickname else (me.email ?: "Someone")
-        val myCode = myDoc.getString("friendCode") ?: me.uid.take(6).uppercase()
+        val myCodeForRequest = myDoc.getString("friendCode") ?: myCode
 
         val addedYouData = hashMapOf(
             "fromUid" to me.uid,
             "fromName" to myDisplayName,
-            "fromFriendCode" to myCode,
+            "fromFriendCode" to myCodeForRequest,
             "timestamp" to System.currentTimeMillis()
         )
 
@@ -232,18 +300,26 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         userPrefs.nickname = nickname
-
                         val currentUser = FirebaseAuth.getInstance().currentUser
                         if (currentUser != null) {
-                            db.collection("public_users")
-                                .document(currentUser.uid)
-                                .set(
-                                    mapOf(
-                                        "uid" to currentUser.uid,
-                                        "nickname" to nickname,
-                                        "friendCode" to (myFriendCode ?: currentUser.uid.take(6).uppercase())
+                            scope.launch {
+                                try {
+                                    val resolvedCode = ensurePublicUserDoc(
+                                        db = db,
+                                        uid = currentUser.uid,
+                                        nickname = nickname,
+                                        existingFriendCode = myFriendCode ?: cachedFriendCode
                                     )
-                                )
+                                    myFriendCode = resolvedCode
+                                    cachedFriendCode = resolvedCode
+                                    friendStatus = "Nickname saved ✅"
+                                } catch (e: Exception) {
+                                    Log.e(PROFILE_TAG, "Failed to save nickname", e)
+                                    friendStatus = "Saved nickname locally. Cloud sync will retry later."
+                                }
+                            }
+                        } else {
+                            friendStatus = "Nickname saved locally ✅"
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -295,8 +371,17 @@ fun ProfileScreen(
                                     if (friendStatus.contains("✅")) {
                                         friendCodeInput = ""
                                     }
-                                } catch (_: Exception) {
-                                    friendStatus = "Couldn’t add friend. Check internet."
+                                } catch (e: Exception) {
+                                    Log.e(PROFILE_TAG, "Failed to add friend", e)
+                                    friendStatus = when ((e as? FirebaseFirestoreException)?.code) {
+                                        FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                                            "Couldn’t add friend. Firestore permissions are blocking access."
+                                        FirebaseFirestoreException.Code.UNAVAILABLE ->
+                                            "Couldn’t reach Firestore right now. Try again in a moment."
+                                        FirebaseFirestoreException.Code.UNAUTHENTICATED ->
+                                            "Please log out and back in, then try again."
+                                        else -> "Couldn’t add friend right now."
+                                    }
                                 } finally {
                                     loadingFriendOp = false
                                 }

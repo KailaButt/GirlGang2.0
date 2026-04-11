@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -30,7 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.consolicalm.ui.theme.AppScaffold
 import com.example.consolicalm.ui.theme.AppTheme
 import com.example.consolicalm.ui.theme.ConsoliCalmTheme
@@ -42,6 +45,7 @@ enum class AppTab(val label: String, val icon: ImageVector) {
     STUDY("Study", Icons.Filled.Timer),
     TODO("To-Do", Icons.Filled.CheckCircle),
     CALM("Calm", Icons.Filled.Favorite),
+    GAMES("Games", Icons.Filled.Extension),
     PROFILE("Profile", Icons.Filled.Person)
 }
 
@@ -144,7 +148,15 @@ class MainActivity : ComponentActivity() {
                                             selected = currentTab == tab,
                                             onClick = { handleLeaveAttempt(tab) },
                                             icon = { Icon(tab.icon, contentDescription = tab.label) },
-                                            label = { Text(tab.label) }
+                                            label = {
+                                                Text(
+                                                    text = tab.label,
+                                                    fontSize = 8.sp,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         )
                                     }
                                 }
@@ -196,6 +208,19 @@ class MainActivity : ComponentActivity() {
 
                                     AppTab.CALM -> MeditationScreen(
                                         onBack = { currentTab = AppTab.HOME },
+                                        onEarnPoints = { earned ->
+                                            calmPoints += earned
+
+                                            weeklyInsightsRepository.incrementWeeklyStats(
+                                                nickname = currentNickname,
+                                                pointsToAdd = earned
+                                            )
+                                        }
+                                    )
+
+
+
+                                    AppTab.GAMES -> GamesScreen(
                                         onEarnPoints = { earned ->
                                             calmPoints += earned
 
