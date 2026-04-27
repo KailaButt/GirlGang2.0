@@ -28,7 +28,13 @@ class WeeklyInsightsViewModel : ViewModel() {
     }
 
     private fun startListening() {
-        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        _uiState.value = _uiState.value.copy(
+            isLoading = true,
+            error = null
+        )
+
+        myInsightListener?.remove()
+        leaderboardListener?.remove()
 
         myInsightListener = repository.listenToMyWeeklyInsight(
             onUpdate = { insight ->
@@ -39,7 +45,7 @@ class WeeklyInsightsViewModel : ViewModel() {
             },
             onError = { e ->
                 _uiState.value = _uiState.value.copy(
-                    error = e.message,
+                    error = e.message ?: "Failed to load your weekly insight",
                     isLoading = false
                 )
             }
@@ -54,7 +60,7 @@ class WeeklyInsightsViewModel : ViewModel() {
             },
             onError = { e ->
                 _uiState.value = _uiState.value.copy(
-                    error = e.message,
+                    error = e.message ?: "Failed to load leaderboard",
                     isLoading = false
                 )
             }
@@ -77,9 +83,41 @@ class WeeklyInsightsViewModel : ViewModel() {
             calmMinutes = calmMinutes,
             moodCheckIns = moodCheckIns,
             onError = { e ->
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to save weekly insight"
+                )
             }
         )
+    }
+
+    fun incrementWeeklyStats(
+        nickname: String,
+        pointsToAdd: Int = 0,
+        sessionsToAdd: Int = 0,
+        tasksToAdd: Int = 0,
+        calmMinutesToAdd: Int = 0,
+        moodCheckInsToAdd: Int = 0
+    ) {
+        repository.incrementWeeklyStats(
+            nickname = nickname,
+            pointsToAdd = pointsToAdd,
+            sessionsToAdd = sessionsToAdd,
+            tasksToAdd = tasksToAdd,
+            calmMinutesToAdd = calmMinutesToAdd,
+            moodCheckInsToAdd = moodCheckInsToAdd,
+            onSuccess = {
+                // no-op, snapshot listeners will update UI automatically
+            },
+            onError = { e ->
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to update weekly stats"
+                )
+            }
+        )
+    }
+
+    fun refresh() {
+        startListening()
     }
 
     override fun onCleared() {

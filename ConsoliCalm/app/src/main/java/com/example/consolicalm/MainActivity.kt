@@ -223,7 +223,6 @@ class MainActivity : ComponentActivity() {
                                     AppTab.GAMES -> GamesScreen(
                                         onEarnPoints = { earned ->
                                             calmPoints += earned
-
                                             weeklyInsightsRepository.incrementWeeklyStats(
                                                 nickname = currentNickname,
                                                 pointsToAdd = earned

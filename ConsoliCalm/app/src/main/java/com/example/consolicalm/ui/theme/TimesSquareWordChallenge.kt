@@ -151,6 +151,27 @@ private suspend fun ts_checkAnswer(
     else         -> userAnswer.trim().isNotBlank()
 }
 
+// ─── New helper functions to fetch example answers ─────────────────────────────
+private suspend fun ts_fetchExampleSynonym(word: String): String = withContext(Dispatchers.IO) {
+    try {
+        val url = "https://api.datamuse.com/words?ml=${encode(word)}&max=1"
+        val json = JSONArray(URL(url).readText())
+        if (json.length() > 0) json.getJSONObject(0).getString("word") else ""
+    } catch (e: Exception) {
+        "" // fallback empty
+    }
+}
+
+private suspend fun ts_fetchExampleRhyme(word: String): String = withContext(Dispatchers.IO) {
+    try {
+        val url = "https://api.datamuse.com/words?rel_rhy=${encode(word)}&max=1"
+        val json = JSONArray(URL(url).readText())
+        if (json.length() > 0) json.getJSONObject(0).getString("word") else ""
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  PUBLIC ENTRY POINT  — called from GamesScreen.kt
 // ══════════════════════════════════════════════════════════════════════════════
@@ -182,6 +203,10 @@ private fun TS_GameHost(onBack: () -> Unit, onEarnPoints: (Int) -> Unit) {
     var score        by remember { mutableStateOf(0) }
     var currentRound by remember { mutableStateOf(1) }
 
+    // ✅ NEW: Example correct answers for each challenge
+    var exampleSynonym by remember { mutableStateOf("") }
+    var exampleRhyme   by remember { mutableStateOf("") }
+
     val answers      = remember { mutableStateListOf("", "", "", "") }
     // IDLE = not submitted, CHECKING = API in progress, CORRECT = ✅, WRONG = ❌
     val answerStates = remember { mutableStateListOf(
@@ -198,13 +223,24 @@ private fun TS_GameHost(onBack: () -> Unit, onEarnPoints: (Int) -> Unit) {
         label         = "ts_alpha"
     )
 
-    // Load word each new round
+    // Load word and example answers each round
     LaunchedEffect(currentRound) {
         isLoading = true
         answers.replaceAll { "" }
         answerStates.replaceAll { TS_AnswerState.IDLE }
         timeLeft = 90
         word = ts_fetchRandomWord()
+
+        // ✅ Fetch example synonym and rhyme in parallel
+        val synonymJob = scope.async(Dispatchers.IO) {
+            ts_fetchExampleSynonym(word)
+        }
+        val rhymeJob = scope.async(Dispatchers.IO) {
+            ts_fetchExampleRhyme(word)
+        }
+        exampleSynonym = synonymJob.await()
+        exampleRhyme   = rhymeJob.await()
+
         isLoading = false
     }
 
@@ -252,10 +288,20 @@ private fun TS_GameHost(onBack: () -> Unit, onEarnPoints: (Int) -> Unit) {
     when (phase) {
         TS_GamePhase.INTRO   -> TS_IntroScreen(isLoading, word, flickerAlpha,
             onStart = { phase = TS_GamePhase.PLAYING }, onBack)
-        TS_GamePhase.PLAYING -> TS_PlayingScreen(word, timeLeft, score, answers, answerStates,
-            flickerAlpha, ::submitAnswer, onGiveUp = { onEarnPoints(score); phase = TS_GamePhase.RESULT })
-        TS_GamePhase.RESULT  -> TS_ResultScreen(word, score, answers, answerStates, currentRound,
-            onNextRound = { currentRound++; phase = TS_GamePhase.INTRO }, onBack)
+        TS_GamePhase.PLAYING -> TS_PlayingScreen(
+            word, timeLeft, score, answers, answerStates,
+            flickerAlpha, ::submitAnswer,
+            onGiveUp = { onEarnPoints(score); phase = TS_GamePhase.RESULT },
+            exampleSynonym = exampleSynonym,   // ✅ Pass examples
+            exampleRhyme   = exampleRhyme
+        )
+        TS_GamePhase.RESULT  -> TS_ResultScreen(
+            word, score, answers, answerStates, currentRound,
+            onNextRound = { currentRound++; phase = TS_GamePhase.INTRO },
+            onBack = onBack,
+            exampleSynonym = exampleSynonym,   // ✅ Pass examples
+            exampleRhyme   = exampleRhyme
+        )
     }
 }
 
@@ -328,7 +374,9 @@ private fun TS_PlayingScreen(
     answerStates: MutableList<TS_AnswerState>,
     flickerAlpha: Float,
     onSubmit: (Int) -> Unit,
-    onGiveUp: () -> Unit
+    onGiveUp: () -> Unit,
+    exampleSynonym: String,   // ✅ New parameters
+    exampleRhyme: String
 ) {
     val timerColor = if (timeLeft > 60) TS_NeonGreen else if (timeLeft > 30) TS_NeonYellow else TS_NeonPink
 
@@ -353,11 +401,14 @@ private fun TS_PlayingScreen(
 
         TS_CHALLENGES.forEachIndexed { i, c ->
             TS_ChallengeCard(
-                challenge    = c,
-                value        = answers[i],
-                answerState  = answerStates[i],
-                onValueChange = { answers[i] = it },
-                onSubmit     = { onSubmit(i) }
+                challenge       = c,
+                value           = answers[i],
+                answerState     = answerStates[i],
+                onValueChange   = { answers[i] = it },
+                onSubmit        = { onSubmit(i) },
+                targetWord      = word,             // ✅ Pass target word for sentence/definition examples
+                exampleSynonym  = exampleSynonym,   // ✅ Pass examples
+                exampleRhyme    = exampleRhyme
             )
         }
 
@@ -379,7 +430,10 @@ private fun TS_ChallengeCard(
     value: String,
     answerState: TS_AnswerState,
     onValueChange: (String) -> Unit,
-    onSubmit: () -> Unit
+    onSubmit: () -> Unit,
+    targetWord: String,        // ✅ New: needed for sentence/definition examples
+    exampleSynonym: String,    // ✅ New
+    exampleRhyme: String       // ✅ New
 ) {
     val focusRequester = remember { FocusRequester() }
     val isLocked = answerState == TS_AnswerState.CORRECT || answerState == TS_AnswerState.CHECKING
@@ -396,6 +450,15 @@ private fun TS_ChallengeCard(
         TS_AnswerState.WRONG    -> TS_NeonRed
         TS_AnswerState.CHECKING -> TS_NeonBlue
         TS_AnswerState.IDLE     -> TS_SubPanel
+    }
+
+    // ✅ Determine the example answer to show when wrong
+    val exampleAnswer = when (challenge.checkType) {
+        "synonym"    -> exampleSynonym.ifEmpty { "e.g., joyful" }
+        "rhyme"      -> exampleRhyme.ifEmpty { "e.g., bat" }
+        "sentence"   -> "The weather is very ${targetWord.lowercase()} today."
+        "definition" -> "${targetWord} means something pleasant or positive."
+        else         -> ""
     }
 
     Surface(
@@ -431,21 +494,31 @@ private fun TS_ChallengeCard(
 
             Text(challenge.hint, color = Color.White.copy(0.45f), fontSize = 12.sp)
 
-            // Wrong answer tip
+            // Wrong answer tip + example
             if (answerState == TS_AnswerState.WRONG) {
                 Surface(shape = RoundedCornerShape(8.dp), color = TS_NeonRed.copy(0.1f)) {
-                    Text(
-                        when (challenge.checkType) {
-                            "synonym"    -> "Try another word with the same meaning"
-                            "rhyme"      -> "The ending sound must match the word"
-                            "sentence"   -> "Use the word in a sentence of 5+ words"
-                            "definition" -> "Explain the meaning in 4+ words"
-                            else         -> "Try again!"
-                        },
-                        color    = TS_NeonRed.copy(0.85f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
+                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                        Text(
+                            when (challenge.checkType) {
+                                "synonym"    -> "Try another word with the same meaning"
+                                "rhyme"      -> "The ending sound must match the word"
+                                "sentence"   -> "Use the word in a sentence of 5+ words"
+                                "definition" -> "Explain the meaning in 4+ words"
+                                else         -> "Try again!"
+                            },
+                            color    = TS_NeonRed.copy(0.85f),
+                            fontSize = 11.sp
+                        )
+                        if (exampleAnswer.isNotBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "💡 Example: $exampleAnswer",
+                                color = Color.White.copy(0.7f),
+                                fontSize = 11.sp,
+                                fontStyle = FontStyle.Italic
+                            )
+                        }
+                    }
                 }
             }
 
@@ -521,7 +594,9 @@ private fun TS_ResultScreen(
     answerStates: List<TS_AnswerState>,
     currentRound: Int,
     onNextRound: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    exampleSynonym: String,   // ✅ New
+    exampleRhyme: String      // ✅ New
 ) {
     val correctCount = answerStates.count { it == TS_AnswerState.CORRECT }
     val msg = when {
@@ -559,6 +634,13 @@ private fun TS_ResultScreen(
                 TS_CHALLENGES.forEachIndexed { i, c ->
                     val state = answerStates[i]
                     val isCorrect = state == TS_AnswerState.CORRECT
+                    val exampleForType = when (c.checkType) {
+                        "synonym"    -> exampleSynonym.ifEmpty { "joyful" }
+                        "rhyme"      -> exampleRhyme.ifEmpty { "bird" }
+                        "sentence"   -> "The ${word.lowercase()} weather is lovely."
+                        "definition" -> "${word} means a feeling of great happiness."
+                        else         -> ""
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             if (isCorrect) "✅" else "❌",
@@ -566,6 +648,7 @@ private fun TS_ResultScreen(
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(c.label, color = Color.White.copy(0.6f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            // Show user answer
                             Text(
                                 if (answers[i].isBlank()) "(no answer given)" else answers[i],
                                 color     = if (isCorrect) TS_NeonGreen else TS_NeonRed.copy(0.85f),
@@ -573,8 +656,16 @@ private fun TS_ResultScreen(
                                 fontStyle = if (answers[i].isBlank()) FontStyle.Italic else FontStyle.Normal,
                                 fontWeight = if (isCorrect) FontWeight.Medium else FontWeight.Normal
                             )
+                            // Show expected answer if user got it wrong
+                            if (!isCorrect && exampleForType.isNotBlank()) {
+                                Text(
+                                    "✔ Expected: $exampleForType",
+                                    color = Color.White.copy(0.6f),
+                                    fontSize = 11.sp,
+                                    fontStyle = FontStyle.Italic
+                                )
+                            }
                             if (isCorrect) {
-                                val pts = 5 // shown as generic since timing isn't known here
                                 Text("+ points earned!", color = TS_NeonGreen.copy(0.7f), fontSize = 11.sp)
                             }
                         }
